@@ -1,7 +1,4 @@
-/**
- * The three bottom overlays (pending annotations / this round's diff / submitted records). One
- * component renders whichever kind is open, with a shared official menu-surface shell.
- */
+
 
 import type { ReactElement } from 'react'
 import {
@@ -15,10 +12,10 @@ import { formatDateTime, formatTime } from '../../../app/utils.js'
 import { quoteBlock } from '../format.js'
 import type { OverlayKind } from '../types.js'
 
-/** Delay before the overlay tooltips appear. */
+
 const TOOLTIP_DELAY_MS = 400
 
-/** One overlay's captured data + callbacks. */
+
 export interface ReviewLayersProps {
   readonly t: DeskTranslator
   readonly overlay: OverlayKind | null
@@ -35,7 +32,7 @@ export interface ReviewLayersProps {
   readonly onClose: () => void
 }
 
-/** Shared header row of one overlay. */
+
 function LayerHead(props: {
   readonly t: DeskTranslator
   readonly icon: ReactElement
@@ -55,7 +52,7 @@ function LayerHead(props: {
   )
 }
 
-/** Render the overlay that is currently open (or nothing). */
+
 export function ReviewLayers(props: ReviewLayersProps): ReactElement | null {
   const {
     t, overlay, annotations, records, baselineAt, diff, totals, pagePath, diffOpen, diffLabels,

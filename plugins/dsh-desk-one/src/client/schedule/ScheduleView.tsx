@@ -1,11 +1,4 @@
-/**
- * Schedule page: read-only aggregation of external calendars, plus connection management.
- *
- * Information architecture follows the rest of Desk One: the tab holds in-panel pages, not modals.
- *   calendar (month / week / list) → sources (connections + calendars) → event detail
- * The calendar page keeps only a toolbar, a one-line upcoming strip and the calendar itself;
- * month and week fill the available height without scrolling.
- */
+
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
@@ -32,7 +25,7 @@ function readView(): ScheduleViewName {
     const stored = window.localStorage.getItem(SCHEDULE_VIEW_STORAGE_KEY)
     if (stored === 'month' || stored === 'week' || stored === 'list') return stored
   } catch {
-    // Storage unavailable: use the default view for this session.
+
   }
   return 'month'
 }
@@ -42,14 +35,14 @@ function readHidden(): Set<string> {
     const stored = window.localStorage.getItem(SCHEDULE_HIDDEN_STORAGE_KEY)
     if (stored !== null) return new Set(JSON.parse(stored) as string[])
   } catch {
-    // Corrupt preference: treat every calendar as visible.
+
   }
   return new Set()
 }
 
 export interface ScheduleHeaderActions {
   openSources: () => void
-  /** True on the in-panel sources page, so the header can host the shared back button. */
+
   onSourcesPage: boolean
   backToCalendar: () => void
 }
@@ -59,9 +52,9 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
   readonly api: ScheduleApi
   readonly headerActionsRef?: { current: ScheduleHeaderActions | null }
   readonly todayContext: TodayContext
-  /** Lets the shared header swap in the back button when the sources page opens. */
+
   readonly onPageChange?: (onSourcesPage: boolean) => void
-  /** Number of sources/calendars with a sync failure; the shared header shows it on the settings button. */
+
   readonly onHealthChange?: (issues: number) => void
 }): ReactElement {
   const today = useMemo(() => startOfLocalDay(new Date()), [])
@@ -83,8 +76,7 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
   const autoSyncTried = useRef(false)
   const loadedOnce = useRef(false)
   const loadTickets = useRef(createLoadTickets())
-  /** One calendar write per calendar at a time: the switches stay clickable, but a double click
-   *  must not send a second patch with the same stale revision (the host answers 409). */
+
   const calendarWrites = useRef(createKeyGuard())
 
   const range = useMemo(() => {
@@ -92,17 +84,13 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
     if (view === 'week') return weekRange(cursor)
     return listRange(listStart, listDays)
   }, [cursor, listDays, listStart, today, view])
-  // Load today plus the whole slider window once; both panels filter locally, dragging never refetches.
+
   const upcoming = useMemo(
     () => listRange(today, SCHEDULE_UPCOMING_MAX_DAYS + 1),
     [today],
   )
 
-  /**
-   * Load one snapshot for the current range.
-   * @returns `true` when this snapshot was applied, `false` when a newer load superseded it (the
-   *   newer load owns both the data and the error state, so a stale rejection must not surface).
-   */
+
   const load = useCallback(async (): Promise<boolean> => {
     const ticket = loadTickets.current.take()
     let nextState: ScheduleStateResponse
@@ -127,7 +115,7 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
 
   useEffect(() => {
     let cancelled = false
-    // Only the very first load blanks the page; background refreshes keep the current surface.
+
     if (!loadedOnce.current) setLoading(true)
     load()
       .then((applied) => { if (!cancelled && applied) setError(null) })
@@ -158,7 +146,7 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
 
   useEffect(() => { onPageChange?.(page === 'sources') }, [page, onPageChange])
 
-  // Publish the page actions to the shared header, matching the notes/tasks header chrome.
+
   useEffect(() => {
     if (headerActionsRef === undefined) return
     headerActionsRef.current = {
@@ -169,7 +157,7 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
     return () => { headerActionsRef.current = null }
   }, [headerActionsRef, page])
 
-  // One auto-sync per mount (stale mirror only), never a state-driven loop.
+
   useEffect(() => {
     if (state === null || autoSyncTried.current) return
     autoSyncTried.current = true
@@ -189,7 +177,7 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
     try {
       window.localStorage.setItem(SCHEDULE_VIEW_STORAGE_KEY, next)
     } catch {
-      // Preference only.
+
     }
   }, [])
 
@@ -197,7 +185,7 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
     try {
       window.localStorage.setItem(SCHEDULE_HIDDEN_STORAGE_KEY, JSON.stringify([...next]))
     } catch {
-      // Preference only.
+
     }
   }, [])
 
@@ -211,7 +199,7 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
     })
   }, [persistHidden])
 
-  /** Source-level master switch: show/hide every calendar of that source at once. */
+
   const cycleColor = useCallback(async (calendar: DeskCalendar): Promise<void> => {
     await calendarWrites.current.run(calendar.id, async () => {
       const index = (SCHEDULE_COLORS as readonly string[]).indexOf(calendar.color)
@@ -242,7 +230,7 @@ export function ScheduleView({ t, api, headerActionsRef, todayContext, onPageCha
     setSelected(point === undefined ? { event } : { event, point })
   }
 
-  /** Month "+N" / day number: jump to the agenda list starting at that day. */
+
   const openDay = (date: Date): void => {
     setListStart(startOfLocalDay(date))
     chooseView('list')

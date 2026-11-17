@@ -1,7 +1,4 @@
-/**
- * Task groups: one-level containers inside a lane. Pure input normalization, record creation,
- * patching with optimistic concurrency, sorting and filtering.
- */
+
 
 import { DESK_NODE_SCHEMA } from '../constants.js'
 import type { DeskTaskGroup, TaskStatus } from '../contract.js'
@@ -20,7 +17,7 @@ export interface GroupPatch {
   readonly archived?: boolean
 }
 
-/** Normalize a group creation request; groups always live in exactly one lane. */
+
 export function normalizeGroupInput(raw: {
   readonly name?: unknown
   readonly status?: unknown
@@ -33,7 +30,7 @@ export function normalizeGroupInput(raw: {
   return { name, status, order: normalizeOrder(raw.order) ?? 0 }
 }
 
-/** Create a group record (pure: id / time come from the caller). */
+
 export function createGroupRecord(
   input: GroupInput,
   meta: { readonly id: string; readonly now: string },
@@ -52,7 +49,7 @@ export function createGroupRecord(
   }
 }
 
-/** Apply a name / order patch; lane moves go through the store (they cascade to member tasks). */
+
 export function patchGroupRecord(
   current: DeskTaskGroup,
   patch: GroupPatch,
@@ -90,7 +87,7 @@ export function patchGroupRecord(
   return next
 }
 
-/** Group order inside a lane: manual order, then creation time, then id (stable fallback). */
+
 export function sortGroups(groups: readonly DeskTaskGroup[]): DeskTaskGroup[] {
   return [...groups].sort((left, right) =>
     left.order - right.order
@@ -98,10 +95,9 @@ export function sortGroups(groups: readonly DeskTaskGroup[]): DeskTaskGroup[] {
     || left.id.localeCompare(right.id))
 }
 
-/** Keyword filter over group names (case-insensitive); empty query returns all. */
+
 export function filterGroups(groups: readonly DeskTaskGroup[], query: string | undefined): DeskTaskGroup[] {
   const text = (query ?? '').trim().toLowerCase()
   if (text === '') return [...groups]
   return groups.filter(group => group.name.toLowerCase().includes(text))
 }
-

@@ -1,4 +1,4 @@
-/** 额度面板主体与定位（右缘对齐入口、左缘钳制会话区）；portal 到 body 由入口组件决定。 */
+
 
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import type { RefObject } from 'react'
@@ -18,7 +18,7 @@ export interface PanelPoint {
   width: number
 }
 
-/** 重置时间只展示到日；距重置天数不足一天按 1 天计（无效 / 已过返回 null）。 */
+
 function formatReset(raw: string | undefined): string | undefined {
   if (raw === undefined) return undefined
   const match = /^(\d{4}-\d{2}-\d{2}) 00:00:00$/u.exec(raw)
@@ -32,13 +32,13 @@ function daysUntil(date: string): number | null {
   return days >= 1 ? days : null
 }
 
-/** 百分比文案：占比不足 1% 时保留三位小数（0.020%），否则取整。 */
+
 function percentText(ratio: number): string {
   const percent = ratio * 100
   return percent < 1 ? percent.toFixed(3) : String(Math.round(percent))
 }
 
-/** 面板几何与关闭行为：定位先量再画；点击面板外 / Escape 关闭，滚动与尺寸变化时重算。 */
+
 export function usePanelPoint(
   rootRef: RefObject<HTMLElement>,
   open: boolean,
@@ -46,7 +46,7 @@ export function usePanelPoint(
 ): PanelPoint | null {
   const [point, setPoint] = useState<PanelPoint | null>(null)
 
-  /** 计算面板位置：右缘对齐按钮、左缘钳制在会话区（不够宽时收缩，绝不越过左缘）。 */
+
   const position = useCallback(() => {
     const rect = rootRef.current?.getBoundingClientRect()
     if (rect === undefined) return
@@ -59,7 +59,7 @@ export function usePanelPoint(
     })
   }, [rootRef])
 
-  /** 打开时必须先量再画：放 useEffect 会先画一帧旧坐标。 */
+
   useLayoutEffect(() => {
     if (!open) return
     position()
@@ -68,7 +68,7 @@ export function usePanelPoint(
   useEffect(() => {
     if (!open) return
     const onMouseDown = (event: MouseEvent) => {
-      // portal 面板不在 rootRef 内：按面板类名豁免，其余点击关闭。
+
       const target = event.target
       if (target instanceof Element && target.closest(`.${CCB_CLASS.panel}`) !== null) return
       if (!rootRef.current?.contains(target as Node)) onClose()
@@ -99,7 +99,7 @@ export interface CreditsPanelProps {
   quota: QuotaView | undefined
   quotaError: string | undefined
   model: ModelFactView | undefined
-  /** 已作用域化的面板方标 SVG（实例 id 由入口组件统一生成）。 */
+
   markSvg: string
   maxMode: boolean
   maxBusy: boolean
@@ -121,11 +121,11 @@ export function CreditsPanel({
   maxError,
   onToggleMaxMode,
 }: CreditsPanelProps) {
-  // 只读事实（系数 · 上下文长度）：与设置清单、模型选择器同一口径；无事实时只显示模型名。
+
   const modelFactsText = formatModelFacts(model)
 
   const account = status?.account
-  // /v2/accounts 的 type：ultimate（企业）/ personal，enterprise 兼容旧形状。
+
   const accountText = [
     account?.accountType === 'enterprise' || account?.accountType === 'ultimate'
       ? t('account.enterprise')
@@ -159,7 +159,7 @@ export function CreditsPanel({
     >
       <div className={CCB_CLASS.panelHead}>
         <span className={CCB_CLASS.panelMark} dangerouslySetInnerHTML={{ __html: markSvg }} />
-        {/* 标题不换行：放不下时省略号截断，把空间让给徽章。 */}
+        {}
         <span className={CCB_CLASS.panelTitle}>
           {t('indicator.title')}
         </span>
@@ -192,7 +192,7 @@ export function CreditsPanel({
             {quota !== undefined
               ? (
                 <>
-                  {/* 容量条对齐 dsh-file-manage：16px 厚、斜纹未使用区、文字居中、官方 info-hover 填充。 */}
+                  {}
                   <div className={CCB_CLASS.quotaTitle}>
                     {t('indicator.quotaTitle')}
                   </div>
@@ -245,7 +245,7 @@ export function CreditsPanel({
       {loadError !== undefined
         ? <div className={CCB_CLASS.danger}>{loadError}</div>
         : null}
-      {/* Max 模式（推理档位锁）：模型卡上方独立一行；锁开后所有推理模型请求强制 max 档。 */}
+      {}
       {status?.keyConfigured === true
         ? (
           <>
@@ -277,7 +277,7 @@ export function CreditsPanel({
         ? (
           <>
             <div className={CCB_CLASS.divider} />
-            {/* 模型卡：加粗名 + 右侧只读事实 → 描述 → 可用功能。 */}
+            {}
             <div className={CCB_CLASS.modelRow}>
               <span className={CCB_CLASS.modelName}>
                 {model.name}

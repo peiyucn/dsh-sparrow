@@ -1,24 +1,18 @@
-/** Client-side pagination for the notebook list views (the library itself stays server-side). */
 
-/** Rows shown per page in every notebook view. */
+
+
 export const NOTEBOOK_PAGE_SIZE = 20
 
-/** One page of rows plus the page bounds after clamping. */
+
 export interface PageSlice<Row> {
   readonly rows: readonly Row[]
-  /** Clamped 1-based page number actually shown. */
+
   readonly page: number
-  /** Total number of pages (at least 1, so an empty list still renders "1 / 1"). */
+
   readonly pages: number
 }
 
-/**
- * Slice one list into a page, clamping an out-of-range request to the existing bounds.
- * @param rows - the whole filtered list.
- * @param page - requested 1-based page.
- * @param pageSize - rows per page.
- * @returns the page slice plus clamped page and page count.
- */
+
 export function paginate<Row>(rows: readonly Row[], page: number, pageSize = NOTEBOOK_PAGE_SIZE): PageSlice<Row> {
   const pages = Math.max(1, Math.ceil(rows.length / pageSize))
   const requested = Number.isFinite(page) ? Math.trunc(page) : 1
@@ -27,27 +21,15 @@ export function paginate<Row>(rows: readonly Row[], page: number, pageSize = NOT
   return { rows: rows.slice(start, start + pageSize), page: current, pages }
 }
 
-/**
- * One server-paged library page, tied to the root it was read from.
- *
- * The host pages over the linked root, so a root switch makes the in-flight page describe a
- * different library. Keeping the root on the snapshot lets the view ignore it until the new
- * fetch resolves instead of flashing the previous workspace's rows (and showing them forever when
- * no root is linked at all).
- */
+
 export interface RootedPage<Entry> {
-  /** Library root the entries were read from; `undefined` when no library is linked. */
+
   readonly rootPath: string | undefined
   readonly entries: readonly Entry[]
   readonly total: number
 }
 
-/**
- * Return the snapshot only while it still describes `rootPath`.
- * @param page - last loaded page, if any.
- * @param rootPath - root the list is rendering for.
- * @returns the page when it matches, otherwise `null`.
- */
+
 export function pageForRoot<Entry>(
   page: RootedPage<Entry> | null,
   rootPath: string | undefined,

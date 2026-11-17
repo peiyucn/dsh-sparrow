@@ -1,16 +1,10 @@
-/**
- * dsh-codebuddy-credits 客户端样式层（**唯一的 CSS 文本来源**）：
- * 五个组件原有的 `ensure*Styles()` 收敛为纯 `build*Css()` 构建函数 + 类名常量表，
- * 由 client/index.ts 统一注入一次（marker 选择器 + HMR 刷新）并在卸载时移除。
- * 组件只保留必要的动态 inline style（面板定位、进度条宽度、hero 落点等）。
- * 视觉 token 一律走官方 `--dsw-*` / `--dsh-*`，不引入自有设计。
- */
+
 
 import { MARK_COLLAPSE_PX, STYLE_SELECTOR } from '../constants.js'
 
-/** 组件共用的类名（对外导出给组件用，避免两处各写一遍字符串）。 */
+
 export const CCB_CLASS = Object.freeze({
-  // 顶栏入口 / 面板
+
   trigger: 'ccb-indicator-trigger',
   triggerHero: 'ccb-indicator-trigger-hero',
   heroAnchor: 'ccb-hero-anchor',
@@ -40,7 +34,7 @@ export const CCB_CLASS = Object.freeze({
   modelFacts: 'ccb-indicator-model-facts',
   featuresRow: 'ccb-indicator-features',
   featuresValue: 'ccb-indicator-features-value',
-  // 设置卡
+
   cardRoot: 'ccb-card-root',
   cardRootHidden: 'ccb-card-root-hidden',
   cardEditor: 'ccb-card-editor',
@@ -64,17 +58,17 @@ export const CCB_CLASS = Object.freeze({
   cardButtonClear: 'ccb-card-button-clear',
   cardButtonRefresh: 'ccb-card-button-refresh',
   cardNotice: 'ccb-card-notice',
-  // 会话积分胶囊
+
   statsPill: 'ccb-session-stats-pill',
   statsLabel: 'ccb-session-stats-label',
-  // 每轮积分胶囊
+
   turnTrigger: 'ccb-turn-credit-trigger',
   turnLabel: 'ccb-turn-credit-label',
-  // 模型行只读事实
+
   modelLabel: 'ccb-model-label',
   modelLabelName: 'ccb-model-labelName',
   modelLabelFacts: 'ccb-model-labelFacts',
-  // 积分弹层
+
   dialog: 'ccb-credit-dialog',
   dialogTitle: 'ccb-credit-dialog-title',
   dialogTitleLabel: 'ccb-credit-dialog-title-label',
@@ -85,11 +79,11 @@ export const CCB_CLASS = Object.freeze({
   dialogGroup: 'ccb-credit-dialog-group',
   dialogValue: 'ccb-credit-dialog-value',
   dialogModel: 'ccb-credit-dialog-model',
-  // 加载态
+
   busyDot: 'ccb-busy-dot',
 })
 
-/** 顶栏入口 + 面板样式（视觉与 2026-10 版一致；窄化靠官方 `.titleRow` 的匿名容器查询）。 */
+
 export function buildIndicatorCss(): string {
   return `/* CodeBuddy 顶栏入口：hover / focus / 容器查询只能走样式表 */
 .ccb-indicator-button {
@@ -191,7 +185,7 @@ export function buildIndicatorCss(): string {
 `
 }
 
-/** 设置卡样式（官方 ProviderEditor / ModelsSection 同款；:focus 等伪类只能走样式表）。 */
+
 export function buildCardCss(): string {
   return `/* CodeBuddy Credits 设置卡：只隐藏官方占位编辑器，行头「编辑」按钮保留 */
 .ccb-card-root-hidden { display: none; }
@@ -245,9 +239,9 @@ li:has(.ccb-card-root) > div:first-child:not(:has(> span:last-child)) { display:
 `
 }
 
-/** 会话积分胶囊样式（官方 `.pill` 圆角是紧凑控件档 R8）。 */
+
 export function buildStatsCss(): string {
-  /** 官方字号/行高设在外层 `.anchor`（`.pill` 上不设），我们不在其中、`font: inherit` 会大一档，故照抄。 */
+
   const pillRadius = 'var(--dsw-radius-sm)'
   const pillFontSize = 'calc(var(--dsh-content-font-size-secondary, 13px) - 1px)'
   const pillLineHeight = 'calc(20px + var(--dsh-content-font-delta-secondary, 0px))'
@@ -275,7 +269,7 @@ export function buildStatsCss(): string {
 `
 }
 
-/** 每轮积分胶囊样式（对齐官方 TurnUsagePanel.module.css 的 .trigger 配方）。 */
+
 export function buildTurnCreditCss(): string {
   return `/* 每轮积分胶囊 */
 .ccb-turn-credit-trigger {
@@ -302,7 +296,7 @@ export function buildTurnCreditCss(): string {
 `
 }
 
-/** 模型行只读事实样式。 */
+
 export function buildModelLabelCss(): string {
   return `/* 模型行只读事实（倍率 · 上下文） */
 .ccb-model-label { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
@@ -311,7 +305,7 @@ export function buildModelLabelCss(): string {
 `
 }
 
-/** 积分弹层皮肤（官方 rc.3 stat-dialog 同配方：CSS 锚点定位 + @position-try 兜底）。 */
+
 export function buildCreditDialogCss(): string {
   return `/* 积分弹层：官方 .panel（触发件挂 anchorName、弹层挂 positionAnchor，落位规则见下） */
 .ccb-credit-dialog {
@@ -423,14 +417,14 @@ export function buildCreditDialogCss(): string {
 `
 }
 
-/** 加载态容器（只有布局；颜色与转圈几何来自官方 StateDot）。 */
+
 export function buildBusyDotCss(): string {
   return `/* 加载态：光秃秃一个官方转圈（文案挂在 aria-label 上） */
 .ccb-busy-dot { display: inline-flex; align-items: center; }
 `
 }
 
-/** 全部样式表文本（client half 统一注入）。 */
+
 export function buildCodeBuddyCss(): string {
   return [
     buildIndicatorCss(),
@@ -443,10 +437,7 @@ export function buildCodeBuddyCss(): string {
   ].join('\n')
 }
 
-/**
- * 注入 / 刷新本插件样式表并返回 `<style>`：marker 选择器让 HMR / 重载复用同一个标签
- * （不叠加第二份），调用方用 `ctx.effect` 在卸载时移除。
- */
+
 export function injectCodeBuddyStyles(): HTMLStyleElement {
   const css = buildCodeBuddyCss()
   const existing = document.querySelector<HTMLStyleElement>(STYLE_SELECTOR)

@@ -1,4 +1,4 @@
-/** Icon actions for session rows: element-level operations are icons, section-level ones stay text. */
+
 import type { ReactElement } from 'react'
 import { ActionTooltip } from '../app/ActionTooltip.js'
 
@@ -15,7 +15,7 @@ const PATHS: Record<SessionActionKind, ReactElement> = {
 export function SessionRowAction(props: {
   readonly kind: SessionActionKind
   readonly label: string
-  /** Text shown in place of the icon after the first click of a two-step action. */
+
   readonly confirmLabel?: string
   readonly armed?: boolean
   readonly danger?: boolean

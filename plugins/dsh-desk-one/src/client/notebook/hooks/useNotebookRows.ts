@@ -1,8 +1,4 @@
-/**
- * Notebook list view: the row model, the four view modes' client-side filtering, search and the
- * dual paging strategy (server-paged for the whole library, client-paged for search / drafts /
- * history), plus the count line carried by the list header.
- */
+
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { DeskTranslator } from '../../app/types.js'
@@ -12,7 +8,7 @@ import type { NotebookApi } from '../api.js'
 import { NOTEBOOK_PAGE_SIZE, pageForRoot, paginate, type RootedPage } from '../paging.js'
 import type { NotebookMode, NotebookRow } from '../page-types.js'
 
-/** Row model + paging for the notebook list. */
+
 export interface NotebookRows {
   readonly searching: boolean
   readonly rows: readonly NotebookRow[]
@@ -23,7 +19,7 @@ export interface NotebookRows {
   readonly summaryHint: string | null
 }
 
-/** Build the notebook list rows for the current view. */
+
 export function useNotebookRows(input: {
   readonly t: DeskTranslator
   readonly notebook: NotebookApi
@@ -43,7 +39,7 @@ export function useNotebookRows(input: {
   const [results, setResults] = useState<readonly NotebookEntry[] | null>(null)
   const [paged, setPaged] = useState<RootedPage<NotebookEntry> | null>(null)
 
-  // Search is a flat library query; clearing returns to the recent shelf.
+
   useEffect(() => {
     if (query.trim() === '') { setResults(null); return }
     let cancelled = false
@@ -66,7 +62,7 @@ export function useNotebookRows(input: {
     needle === '' || values.some(value => value.toLowerCase().includes(needle))
   ), [needle])
 
-  /** How many submitted records each file has (row badges). */
+
   const recordCounts = useMemo(() => {
     const map = new Map<string, number>()
     for (const entry of history) {
@@ -76,15 +72,15 @@ export function useNotebookRows(input: {
     return map
   }, [history])
 
-  /** Unsaved annotation count per file path. */
+
   const draftCounts = useMemo(() => {
     const map = new Map<string, number>()
     for (const draft of state?.drafts ?? []) map.set(draft.path, draft.drafts.length)
     return map
   }, [state?.drafts])
 
-  // Whole-library views page on the server: the list is the library, so its rows and its count
-  // always describe the same set (no "30 recent vs 104 total" mismatch).
+
+
   const serverPaged = !searching && (mode === 'recent' || mode === 'missing')
   useEffect(() => {
     if (!active || rootPath === undefined || searching) return
@@ -101,7 +97,7 @@ export function useNotebookRows(input: {
     })
     return () => { cancelled = true }
   }, [active, mode, notebook, page, rootPath, searching, setError, state?.stats.missingFrontmatter, state?.stats.total])
-  // A page read from another root is not this list: ignore it until the new root's page lands.
+
   const currentPage = pageForRoot(paged, rootPath)
 
   const entryRow = useCallback((entry: NotebookEntry): NotebookRow => ({
@@ -115,7 +111,7 @@ export function useNotebookRows(input: {
     onOpen: () => { void openPage(entry.path) },
   }), [draftCounts, openPage, recordCounts])
 
-  /** All matching rows (client-paged for search / drafts / history; one server page otherwise). */
+
   const allRows = useMemo<readonly NotebookRow[]>(() => {
     if (mode === 'history') {
       return history
@@ -155,7 +151,7 @@ export function useNotebookRows(input: {
     ? { rows: allRows, page: Math.min(page, pages), pages }
     : paginate(allRows, page)
 
-  // Keep the stored page in sync with the clamped one (deleting the last row of a page, filtering).
+
   useEffect(() => {
     if (slice.page !== page) setPage(slice.page)
   }, [page, setPage, slice.page])

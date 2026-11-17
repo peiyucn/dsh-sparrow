@@ -1,4 +1,4 @@
-/** Locale fragment: schedule views, calendar sources and the today summary. */
+
 
 export const zh = {
   'schedule.addConnection': '连接日程源',
@@ -110,7 +110,7 @@ export const zh = {
   'today.title': '今日',
 } as const
 
-/** Same keys as `zh`; the `satisfies` keeps the two views in lockstep at compile time. */
+
 export const en = {
   'schedule.addConnection': 'Connect calendars',
   'schedule.addSubscription': 'Add subscription',

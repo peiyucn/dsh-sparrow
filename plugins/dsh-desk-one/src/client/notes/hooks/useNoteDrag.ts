@@ -1,12 +1,4 @@
-/**
- * Drag and resize interactions for wall notes on a fixed-width, vertically infinite canvas.
- *
- * During a gesture we mutate the dragged element's style directly and only commit to React
- * state on pointer-up: that keeps each pointermove O(1) instead of re-rendering the whole wall,
- * which matters when the wall is full (100 notes by design). The wall is not scrolled during a
- * gesture; pointer coordinates are converted to canvas coordinates through the wall's current
- * scrollTop, so a note keeps following the cursor exactly at any scroll position.
- */
+
 
 import { useCallback } from 'react'
 import type { Dispatch, PointerEvent as ReactPointerEvent, RefObject, SetStateAction } from 'react'
@@ -20,9 +12,9 @@ type Patch = Parameters<DeskPanelInjected['updateNote']>[0]['patch']
 
 interface DragDeps {
   readonly wallSize: WallSize
-  /** Scrollport (fixed width, vertically infinite). */
+
   readonly wallRef: { current: HTMLDivElement | null }
-  /** Canvas inside the scrollport; note coordinates are canvas-relative and start below the glass chrome. */
+
   readonly canvasRef: RefObject<HTMLDivElement | null>
   readonly setNotes: Dispatch<SetStateAction<readonly DeskNote[]>>
   readonly savePatch: (note: DeskNote, patch: Patch) => void
@@ -33,9 +25,9 @@ export interface NoteDrag {
   readonly startResize: (event: ReactPointerEvent<HTMLElement>, item: PlacedNote) => void
 }
 
-// Deliberately no edge auto-scroll: moving the wall while the user drags fights the pointer
-// and sweeps notes back toward the top. The wall scrolls only through wheel/scrollbar gestures;
-// the note itself always stays under the pointer.
+
+
+
 
 export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch }: DragDeps): NoteDrag {
   const liveWidth = useCallback((): number => {
@@ -45,7 +37,7 @@ export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch 
 
   const startDrag = useCallback((event: ReactPointerEvent<HTMLElement>, item: PlacedNote): void => {
     const target = event.target as HTMLElement
-    // Textarea / buttons / resize grip own their gestures; only the paper itself drags.
+
     if (event.button !== 0 || target.closest('textarea,button,.dsh-desk-note-resize')) return
     event.preventDefault()
     const startX = event.clientX
@@ -53,19 +45,19 @@ export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch 
     const wall = wallRef.current
     const canvas = canvasRef.current
     const startRect = (canvas ?? wall)?.getBoundingClientRect()
-    // Grab offset inside the note, expressed in canvas coordinates.
+
     const grabX = startX - (startRect?.left ?? 0) - item.x
     const grabY = startY - (startRect?.top ?? 0) - item.y
     const width = liveWidth()
     const element = event.currentTarget
-    // A slight tilt while dragging sells the "paper" metaphor; removed on drop/cancel.
+
     element.dataset.dragging = 'true'
     let currentX = item.x
     let currentY = item.y
     let moved = false
     let pointerX = startX
     let pointerY = startY
-    /** Pin the note under the pointer in canvas coordinates (pointer + current scrollTop). */
+
     const placeFromPointer = (): void => {
       if (wall !== null) {
         const rectNow = (canvasRef.current ?? wall).getBoundingClientRect()
@@ -80,8 +72,8 @@ export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch 
     }
     const onMove = (moveEvent: PointerEvent): void => {
       if (moveEvent.pointerId !== event.pointerId) return
-      // Releasing outside the window delivers no `pointerup`; the first move afterwards carries
-      // `buttons === 0` and means the gesture is already over, so restore the note.
+
+
       if (moveEvent.buttons === 0) { cancel(); return }
       const dx = moveEvent.clientX - startX
       const dy = moveEvent.clientY - startY
@@ -102,7 +94,7 @@ export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch 
         : note))
       savePatch(item.note, { x: currentX, y: currentY })
     }
-    /** Missed-release path: undo the optimistic element position, keep the stored layout. */
+
     const cancel = (): void => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', finish)
@@ -123,7 +115,7 @@ export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch 
     const startX = event.clientX
     const startY = event.clientY
     const maxWidth = Math.max(NOTE_MIN_WIDTH, liveWidth() - item.x)
-    // The canvas is vertically infinite: only the configured upper bound applies to height.
+
     const maxHeight = NOTE_MAX_SIZE
     const element = event.currentTarget.closest('.dsh-desk-note') as HTMLElement | null
     let currentWidth = item.width
@@ -131,7 +123,7 @@ export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch 
     let moved = false
     const onMove = (moveEvent: PointerEvent): void => {
       if (moveEvent.pointerId !== event.pointerId) return
-      // Same missed-release handling as the drag gesture: no pressed button means it is over.
+
       if (moveEvent.buttons === 0) { cancel(); return }
       moved = true
       currentWidth = clamp(Math.round(item.width + moveEvent.clientX - startX), NOTE_MIN_WIDTH, Math.min(maxWidth, NOTE_MAX_SIZE))
@@ -151,7 +143,7 @@ export function useNoteDrag({ wallSize, wallRef, canvasRef, setNotes, savePatch 
         : note))
       savePatch(item.note, { width: currentWidth, height: currentHeight })
     }
-    /** Missed-release path: undo the optimistic element size, keep the stored layout. */
+
     const cancel = (): void => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', finish)

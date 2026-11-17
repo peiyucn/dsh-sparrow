@@ -1,4 +1,4 @@
-/** Group REST routes: one-level task groups are first-class nodes (see store.moveGroup for lane moves). */
+
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { MAX_QUERY_CHARS, ROUTES, TASK_STATUSES } from '../../constants.js'

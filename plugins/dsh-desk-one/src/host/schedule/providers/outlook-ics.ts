@@ -1,31 +1,18 @@
-/**
- * ICS fetching for the schedule sources: the historical Outlook published-link channel and the
- * provider-agnostic public ICS subscription channel.
- *
- * Links are user-provided, so each channel has its own host policy:
- * - `outlook`: only the documented Microsoft hosts (the published-link channel is Microsoft-only);
- * - `public`: any https host except loopback / private / link-local destinations (a pasted link may
- *   point into the local network, and the host must not become an SSRF proxy). Redirects are
- *   followed by hand so every hop is checked against the same policy — with fetch's automatic
- *   following a public feed could bounce the host to `http://127.0.0.1/…` unchecked.
- *
- * Conditional GET with `If-None-Match` keeps the 3–24h server refresh cheap; a 200 that carries a
- * login page / policy block is an auth failure, never parsed as iCalendar.
- */
+
 
 import { isIP } from 'node:net'
 import { SCHEDULE_REQUEST_TIMEOUT_MS } from '../../../constants.js'
 import { ScheduleError } from '../types.js'
 
-/** Host policy of one ICS link: the Outlook whitelist, or the generic public-subscription rule. */
+
 export type IcsHostPolicy = 'outlook' | 'public'
 
 interface OutlookIcsFetchOptions {
-  /** ETag from the previous pull; sent as `If-None-Match`. */
+
   etag?: string
   fetchImpl?: typeof fetch
   timeoutMs?: number
-  /** Host allow rule; defaults to the Outlook whitelist. */
+
   hostPolicy?: IcsHostPolicy
 }
 
@@ -39,7 +26,7 @@ const OUTLOOK_HOSTS = new Set(['outlook.live.com', 'outlook.office365.com', 'out
 const MAX_REDIRECTS = 5
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
 
-/** User-facing channel name; the messages of the two channels must not claim to be the other one. */
+
 function channelLabel(policy: IcsHostPolicy): string {
   return policy === 'outlook' ? 'Outlook ICS' : '订阅'
 }
@@ -62,8 +49,8 @@ export async function fetchOutlookIcs(
   const timeoutMs = resolveTimeout(opts.timeoutMs)
   let response: Response
   try {
-    // The Outlook channel keeps fetch's automatic redirects (a Microsoft-owned host only redirects
-    // inside its own surface); the public channel validates every hop itself.
+
+
     response = policy === 'outlook'
       ? await fetchImpl(target.href, { method: 'GET', headers, signal: AbortSignal.timeout(timeoutMs) })
       : await fetchPublicIcs(target, headers, fetchImpl, timeoutMs)
@@ -73,7 +60,7 @@ export async function fetchOutlookIcs(
   }
 
   if (response.status === 304) {
-    // Keep a stable result shape (both keys present): tests and callers read `.ics` unconditionally.
+
     return { notModified: true, ics: undefined, etag: opts.etag }
   }
   if (!response.ok) throwForStatus(response.status, label)
@@ -108,11 +95,7 @@ export async function fetchOutlookIcs(
   }
 }
 
-/**
- * One GET with manual redirect following for the public-subscription policy: every hop must pass
- * `parseIcsUrl(…, 'public')` before the request is made, so a redirect cannot reach an internal
- * address. The single timeout signal bounds the whole chain.
- */
+
 async function fetchPublicIcs(
   target: URL,
   headers: Record<string, string>,
@@ -140,12 +123,12 @@ async function fetchPublicIcs(
   throw new ScheduleError('UNSUPPORTED', '订阅链接重定向次数过多')
 }
 
-/** Release the redirect response body so the socket can be reused; already-consumed bodies are fine. */
+
 async function discardBody(response: Response): Promise<void> {
   try {
     await response.body?.cancel()
   } catch {
-    // Nothing to release.
+
   }
 }
 
@@ -179,14 +162,7 @@ function isAllowedOutlookHost(hostname: string): boolean {
   return OUTLOOK_HOSTS.has(host) || host.endsWith('.outlook.com')
 }
 
-/**
- * Whether a host may be fetched by the public-subscription policy: literal loopback / private /
- * link-local / CGNAT addresses, their IPv6 counterparts and the usual local name suffixes are
- * rejected; everything else is allowed (the link itself is the user's choice).
- *
- * This is a name/literal check, not a resolver pin: a hostname that resolves to an internal address
- * is not detected (the same level as the trust boundary around a user-pasted link).
- */
+
 function isPublicIcsHost(hostname: string): boolean {
   const host = hostname.toLowerCase()
   const bare = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host
@@ -204,7 +180,7 @@ function isPrivateIPv4(host: string): boolean {
   const parts = host.split('.').map(part => Number(part))
   if (parts.length !== 4 || parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) return true
   const [first = 0, second = 0] = parts
-  // Loopback, private, link-local, CGNAT, "this network", multicast and reserved space.
+
   if (first === 0 || first === 10 || first === 127) return true
   if (first === 169 && second === 254) return true
   if (first === 172 && second >= 16 && second <= 31) return true
@@ -218,14 +194,14 @@ function isPrivateIPv6(host: string): boolean {
   const value = host.toLowerCase()
   if (value === '::' || value === '::1') return true
   if (value.startsWith('fe80:') || value.startsWith('fc') || value.startsWith('fd')) return true
-  // IPv4-mapped addresses (::ffff:127.0.0.1) must follow the IPv4 rule.
+
   const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/u.exec(value)
   if (mapped !== null) return isPrivateIPv4(mapped[1] ?? '')
   return false
 }
 
 function throwForStatus(status: number, label: string): never {
-  // 403/404/410 all mean the feed was disabled or re-published: user action required.
+
   if (status === 401 || status === 403 || status === 404 || status === 410) {
     throw new ScheduleError(
       'AUTH_EXPIRED',

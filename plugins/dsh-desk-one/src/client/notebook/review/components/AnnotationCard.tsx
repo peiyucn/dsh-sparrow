@@ -1,11 +1,11 @@
-/** One annotation card: the saved draft shown inline under its line range (or in document scope). */
+
 
 import type { ReactElement } from 'react'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DraftAnnotation } from '../../../../notebook-contract.js'
 import type { DeskTranslator } from '../../../app/types.js'
 
-/** Render one annotation card. */
+
 export function AnnotationCard(props: {
   readonly t: DeskTranslator
   readonly annotation: DraftAnnotation

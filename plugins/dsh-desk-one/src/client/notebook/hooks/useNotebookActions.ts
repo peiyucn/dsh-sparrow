@@ -1,8 +1,4 @@
-/**
- * Notebook actions: workspace linking / switching (registered workspaces + create), opening the
- * official workspace files page, review opening and history deletion. All user-visible busy/notice
- * state lives here; the library data is mutated through the setters the data hook exposes.
- */
+
 
 import { useCallback, useRef } from 'react'
 import type { DeskTranslator } from '../../app/types.js'
@@ -12,19 +8,19 @@ import type { ReviewOpenInput, ReviewOpenResult } from '../review-bridge.js'
 import type { WorkspaceAccess, WorkspacePathView } from '../workspaces.js'
 import type { NotebookLibrary } from './useNotebookLibrary.js'
 
-/** Everything the page body and header actions can trigger. */
+
 export interface NotebookActions {
-  /** Open the official workspace files page (the top-row button). */
+
   readonly openFolder: () => Promise<void>
   readonly chooseRoot: (path: string) => Promise<void>
-  /** Switch to another registered workspace without unlinking first. */
+
   readonly switchTo: (workspace: WorkspacePathView) => Promise<void>
   readonly pickNewWorkspace: () => Promise<void>
   readonly openPage: (path: string) => Promise<void>
   readonly deleteHistory: (id: string) => Promise<void>
 }
 
-/** Bind the notebook page's actions. */
+
 export function useNotebookActions(input: {
   readonly t: DeskTranslator
   readonly notebook: NotebookApi
@@ -32,16 +28,13 @@ export function useNotebookActions(input: {
   readonly library: NotebookLibrary
   readonly onOpenReview: (input: ReviewOpenInput) => Promise<ReviewOpenResult>
   readonly onOpenBrowser: (workspaceId: string) => Promise<ReviewOpenResult>
-  /** Reset the list view to the initial recent page (after switching workspaces). */
+
   readonly resetView: () => void
 }): NotebookActions {
   const { t, notebook, workspaceAccess, library, onOpenReview, onOpenBrowser, resetView } = input
   const { workspace, reload, setState, setHistory, setError, setNotice, setBusy } = library
 
-  /**
-   * Open the official files page of the current workspace; when nothing is linked yet, fall back to
-   * the first registered workspace (or create one) so the core action always does something.
-   */
+
   const openFolder = useCallback(async (): Promise<void> => {
     setBusy(true)
     setError(null)
@@ -88,12 +81,12 @@ export function useNotebookActions(input: {
     }
   }, [chooseRoot, setBusy, setError, workspaceAccess])
 
-  /** Switch without a separate "unlink" step: the UI's whole point of the loose link. */
+
   const switchTo = useCallback(async (next: WorkspacePathView): Promise<void> => {
     await chooseRoot(next.path)
   }, [chooseRoot])
 
-  /** One review-open request at a time: double-click / double-tap must not start two opens. */
+
   const openingRef = useRef(false)
   const openPage = useCallback(async (path: string): Promise<void> => {
     if (workspace === undefined) {

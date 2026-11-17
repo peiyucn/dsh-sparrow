@@ -1,17 +1,14 @@
-/**
- * dsh-chat-fim 客户端样式层：类名表 + 样式表文本 + 注入口。
- * 类名与样式表共用同一份定义 —— TSX 里不再手写类名字符串，样式也不再内联在组件里。
- */
+
 
 import { MENU_MAX_HEIGHT, MENU_Z_INDEX, POPOVER_Z_INDEX, RING_THICKNESS, RING_Z_INDEX, STYLE_ATTR, STYLE_SELECTOR } from '../constants.js'
 
 const PREFIX = 'dsh-chat-fim'
 
-/** 环的角度变量与 keyframes 名（`@property` / `conic-gradient` / `animation` 三处必须同名）。 */
+
 const RING_ANGLE = `--${PREFIX}-angle`
 const RING_SPIN = `${PREFIX}-ring-spin`
 
-/** 组件与样式表共用的类名表。 */
+
 export const CHAT_FIM_CLASS = Object.freeze({
   switch: `${PREFIX}-switch`,
   switchIcon: `${PREFIX}-switch-icon`,
@@ -42,7 +39,7 @@ export const CHAT_FIM_CLASS = Object.freeze({
   dotOn: `${PREFIX}-dot-on`,
 })
 
-/** 样式表文本（注入 `<style>`；规则内容与拆分前逐字一致）。 */
+
 export function buildChatFimCss(): string {
   const cls = CHAT_FIM_CLASS
   return `
@@ -341,10 +338,7 @@ export function buildChatFimCss(): string {
 `
 }
 
-/**
- * 注入本插件样式并返回 style 元素；调用方在卸载时移除。
- * HMR / 重载命中旧标签时只刷新内容，不叠加第二个 style。
- */
+
 export function ensureChatFimStyles(): HTMLStyleElement {
   const css = buildChatFimCss()
   const existing = document.querySelector<HTMLStyleElement>(STYLE_SELECTOR)

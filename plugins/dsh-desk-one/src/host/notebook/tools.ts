@@ -1,11 +1,4 @@
-/**
- * Notebook library tool: one read-only list/search over the user's note pages.
- *
- * The notebook is a filesystem library, not a Desk node: agents read and edit the files with the
- * normal file tools. This tool exists for the part file tools cannot do cheaply — filtering by
- * frontmatter metadata (missing metadata, empty body), tags and titles, and returning the library
- * root so a relative path can be resolved.
- */
+
 
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -13,7 +6,7 @@ import { PACKAGE_NAME } from '../../constants.js'
 import { textOutput, toolError } from '../tools/shared.js'
 import type { NotebookEntry } from '../../notebook-contract.js'
 
-/** Notebook capabilities this tool needs (structural, so tests can fake it). */
+
 export interface NotebookSearchFace {
   root(): string | undefined
   search(input: {
@@ -26,7 +19,7 @@ export interface NotebookSearchFace {
   }): Promise<{ readonly entries: readonly NotebookEntry[]; readonly truncated: boolean }>
 }
 
-/** Register the read-only page list tool. */
+
 export function registerNotebookTools(ctx: Context, notebook: NotebookSearchFace): void {
   ctx.tools.register(defineTool({
     name: 'desk_page_list',

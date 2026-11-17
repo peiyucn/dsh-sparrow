@@ -1,11 +1,4 @@
-/**
- * One task card.
- *
- * The card has two modes: view (default) and edit (one field at a time). In view mode the whole
- * card is a drag surface and title/body are plain text — clicking a field switches it to a
- * textarea. That removes the old ambiguity where most of the card was a textarea and therefore
- * not grabbable; the board distinguishes click vs drag by a movement threshold.
- */
+
 
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
@@ -27,15 +20,15 @@ interface TaskCardProps {
   readonly onPatch: (task: DeskTask, patch: TaskPatchRequest) => void
   readonly onArchive: (task: DeskTask) => void
   readonly onDelete: (id: string) => void
-  /** False when the host lacks the optional session services — the @ entry stays hidden. */
+
   readonly sessionEnabled: boolean
-  /** Linkable sessions (same universe as the composer's @ list, subagent sessions included). */
+
   readonly sessionOptions: readonly SessionChipInfo[]
-  /** This card's linked sessions, resolved live (unavailable ids keep a fallback chip). */
+
   readonly sessionChips: readonly SessionChipInfo[]
   readonly onLinkSessions: (sessionIds: readonly string[]) => void
   readonly onOpenSession: (sessionId: string) => void
-  /** Read full session projections for the preview (turn/step stats). */
+
   readonly onInspectSession: (sessionId: string) => Promise<void>
 }
 
@@ -70,18 +63,18 @@ export function TaskCard({
   const overdue = remaining !== undefined && remaining < 0
   const dueSoon = remaining !== undefined && remaining >= 0 && remaining <= 1
   const canArchive = task.status === 'done'
-  // Stacked swatch: current colour on top, two palette neighbours peeking out behind, so the
-  // control reads as "there are more colours" without a separate palette row.
+
+
   const colorIndex = NOTE_COLORS.indexOf(task.color)
   const behindColors = [2, 1].map(offset => NOTE_COLORS[(colorIndex + offset) % NOTE_COLORS.length])
 
-  // Keep edit-mode textareas sized to their content when a field is opened.
+
   useEffect(() => {
     if (editing === 'title') autoGrow(titleRef.current)
     if (editing === 'body') autoGrow(bodyRef.current)
   }, [editing])
 
-  // Colour palette: close on outside press / Esc (same dismissal rule as other popovers).
+
   useEffect(() => {
     if (!paletteOpen) return
     const onPointerDown = (event: PointerEvent): void => {
@@ -101,7 +94,7 @@ export function TaskCard({
     }
   }, [paletteOpen])
 
-  // Session picker: same dismissal rules as the colour palette.
+
   useEffect(() => {
     if (!sessionPickerOpen) return
     const onPointerDown = (event: PointerEvent): void => {
@@ -121,12 +114,12 @@ export function TaskCard({
     }
   }, [sessionPickerOpen])
 
-  // The projection read resolves asynchronously; stop the loading hint once stats land.
+
   useEffect(() => {
     if (previewChip?.turns !== undefined || previewChip?.steps !== undefined) setPreviewLoading(false)
   }, [previewChip?.steps, previewChip?.turns])
 
-  // Expanded chip: any pointer down outside that chip restores it immediately.
+
   useEffect(() => {
     if (previewId === null) return
     const onPointerDown = (event: PointerEvent): void => {
@@ -146,7 +139,7 @@ export function TaskCard({
     }
   }, [previewId])
 
-  /** Inline expansion: click the same chip again to collapse it. */
+
   const togglePreview = (chip: SessionChipInfo): void => {
     if (previewId === chip.id) {
       setPreviewId(null)
@@ -295,8 +288,8 @@ export function TaskCard({
         : null}
       {sessionPickerOpen && sessionEnabled
         ? createPortal(
-            // Body portal: the lane is a scroll container, so an in-card popover would be
-            // clipped and squeezed; the picker needs the full viewport.
+
+
             <div
               ref={sessionPanelRef}
               className="dsh-task-session-pop"

@@ -1,9 +1,4 @@
-/**
- * Schedule sync orchestration: mirror window pull order and the "one failure never blocks the other
- * sources" rule. Sources run sequentially so one slow line cannot starve the others, and **every**
- * source pull goes through one single-flight slot per source: repeated clicks, post-connection
- * warm-ups and the UI's sync button all join the running pull instead of stacking writes.
- */
+
 
 import type { Context } from '@deepseek-ai/cordis'
 import { SCHEDULE_MAX_EVENTS, SCHEDULE_REQUEST_TIMEOUT_MS } from '../../constants.js'
@@ -21,9 +16,9 @@ import { fetchGraphCalendarEvents, listGraphCalendars } from './providers/graph.
 import { draftFromRemote, scheduleErrorOf, type EventDraft } from './records.js'
 import { adapterDeps, CREDENTIAL_REF, mirrorWindow, PROVIDER_BASE_URL, resolveSecret } from './connections.js'
 
-/** Facade seams the sync layer cannot import directly without a cycle. */
+
 export interface ScheduleSyncDeps {
-  /** Graph access-token seam, owned by the OAuth module (which caches the refresh). */
+
   readonly graphToken: (source: DeskScheduleSource) => Promise<string>
 }
 
@@ -35,7 +30,7 @@ function dedupeDrafts(drafts: readonly EventDraft[]): EventDraft[] {
   return [...seen.values()]
 }
 
-/** Calendar collection identity: pathname when the adapter returned an absolute URL. */
+
 function safePathname(value: string): string {
   try {
     const url = new URL(value)
@@ -50,7 +45,7 @@ export class ScheduleSync {
 
   constructor(private readonly ctx: Context, private readonly store: DeskStore, private readonly deps: ScheduleSyncDeps) {}
 
-  /** Sync every enabled source; sources run sequentially so one slow line cannot starve the others. */
+
   async sync(): Promise<ScheduleSyncResponse> {
     const sources = this.store.listScheduleSources().filter(source => source.enabled)
     const reports: ScheduleSyncSourceReport[] = []
@@ -60,7 +55,7 @@ export class ScheduleSync {
     return { syncedAt: new Date().toISOString(), sources: reports }
   }
 
-  /** Single-flight per source: repeated clicks join the running sync instead of stacking pulls. */
+
   private runSync(source: DeskScheduleSource): Promise<ScheduleSyncSourceReport> {
     const key = source.id
     const running = this.inflight.get(key)
@@ -70,15 +65,12 @@ export class ScheduleSync {
     return task
   }
 
-  /**
-   * Pull one source now. Every caller (UI sync, connection actions, OAuth warm-up) goes through the
-   * per-source single-flight slot, so a warm-up cannot race the UI sync into duplicate writes.
-   */
+
   syncSource(source: DeskScheduleSource): Promise<ScheduleSyncSourceReport> {
     return this.runSync(source)
   }
 
-  /** One pull of one source (joined through {@link runSync} — never call directly from outside). */
+
   private async pullSource(source: DeskScheduleSource): Promise<ScheduleSyncSourceReport> {
     const now = new Date().toISOString()
     await this.store.setScheduleSyncState(source.id, { syncState: 'syncing' })
@@ -96,7 +88,7 @@ export class ScheduleSync {
         for (const calendar of stored.filter(row => row.enabled)) {
           try {
             const drafts = dedupeDrafts(await fetchGraphCalendarEvents(token, calendar.remoteId, window, adapterDeps()))
-            // Count what was actually mirrored, not the raw remote batch: the store caps one sync.
+
             const inserted = Math.min(drafts.length, SCHEDULE_MAX_EVENTS)
             await this.store.syncCalendarEvents(calendar, drafts.slice(0, inserted))
             await this.store.setScheduleSyncState(calendar.id, { lastSyncedAt: now })
@@ -107,8 +99,8 @@ export class ScheduleSync {
         }
       } else if (source.provider === 'ics') {
         const url = await resolveSecret(this.ctx, source.credentialRef ?? CREDENTIAL_REF.ics)
-        // Provider-agnostic subscription: public hosts only (the Outlook published-link whitelist
-        // belongs to the outlook channel below).
+
+
         const fetched = await fetchOutlookIcs(url, { timeoutMs: SCHEDULE_REQUEST_TIMEOUT_MS, hostPolicy: 'public' })
         if (fetched.ics === undefined) throw new DeskError('SCHEDULE_UNAVAILABLE', '订阅链接没有返回内容', 502)
         const [calendar] = await this.store.upsertCalendars(source, [
@@ -147,8 +139,8 @@ export class ScheduleSync {
         const auth = { user: source.account ?? '', password: await resolveSecret(this.ctx, CREDENTIAL_REF[source.provider]) }
         const { homeUrl } = await discoverCalDav(baseUrl, auth, adapterDeps())
         const calendars = await listCalDavCalendars(homeUrl, auth, adapterDeps())
-        // Store the collection path, not the absolute URL: iCloud moves between `pNN-` shards
-        // between sessions, and the path is the stable identity of one calendar.
+
+
         const stored = await this.store.upsertCalendars(source, calendars.map(calendar => {
           const pathname = safePathname(calendar.remoteId)
           return { remoteId: pathname, displayName: calendar.displayName }

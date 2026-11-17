@@ -1,10 +1,4 @@
-/**
- * CodeBuddy 自建适配器：不走 pi-ai 协议层，直接按 CodeBuddy 方言发请求。
- * 本文件只做**请求编排**（构造 body / 发请求 / 错误透传 / 空闲超时 / 取消 / 11128 有界降级），
- * 消息转 wire 见 `adapter/wire.ts`，SSE 解析见 `adapter/sse.ts`，流状态机与 usage 见 `adapter/stream.ts`。
- * 别改的方言行为：stream: true 恒定（非流式服务端 11101）；usage 帧含 credit
- * （DSH 无此字段，随 replayState 持久化）；企业策略错误（如 10081 ip not in whitelist）原样透传服务端文案。
- */
+
 
 import { LlmAdapter, LlmError } from '@deepseek-ai/dsh-llm'
 import type {
@@ -35,52 +29,48 @@ export { parseSseLine } from './adapter/sse.js'
 export { effectiveReasoningEffort, mapFinish, mapUsage } from './adapter/stream.js'
 export { toWireMessages, toWireTools } from './adapter/wire.js'
 
-/** 自适应阶梯的一格：id 只用于诊断，transform 是正文变换。 */
+
 export interface AdaptiveRung {
   id: string
   transform: NeutralizeText
 }
 
-/**
- * 阶梯单一来源（顺序见 `docs/spec/01-runtime-adaptation.md`）：
- * 默认 CGJ → 候选池其余字符 → 整行删除兜底。上游归一化收掉一格就前进一格；
- * 全部用尽即报错等发版（不做二分探测，避免在账号上刷探测流量）。
- */
+
 export const ADAPTIVE_RUNGS: readonly AdaptiveRung[] = [
   { id: 'cgj', transform: neutralizeChannelFingerprints },
   ...NEUTRALIZER_MARKERS.slice(1).map(marker => {
-    // id 带码位（marker-180B），日志里不用再猜是哪一级。
+
     const codePoint = (marker.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0')
     return { id: `marker-${codePoint}`, transform: neutralizeWithMarker(marker) }
   }),
   { id: 'strip', transform: stripChannelFingerprints },
 ]
 
-/** 阶梯用尽时的用户可见提示（追加在服务端文案之后）。 */
+
 const ADAPT_EXHAUSTED_HINT = '已尝试自动降级，仍被拒；需升级插件'
 
 export interface CodeBuddyAdapterOptions {
-  /** 当前生效的模型事实（设置节驱动，每次调用现读）。 */
+
   models(): readonly CodeBuddyModelFacts[]
   resolveApiKey(): Promise<string>
-  /** 企业上下文（uid/enterpriseId 出自 /v2/accounts）。 */
+
   account(): { userId?: string; enterpriseId?: string } | undefined
-  /** 流式读取空闲超时（毫秒）。 */
+
   streamIdleTimeoutMs: number
-  /** 宿主读取本适配器模型目录时的回调（模型选择器建目录触发），插件侧在此做节流后台刷新。 */
+
   onCatalogRead?: () => void
-  /** 图片字节读取（官方附件 seam）；未配置时带图请求以明确错误失败。 */
+
   readImage?: CodeBuddyReadImage
-  /** 带图请求在模型事实为空时等待目录落定的上限（普通请求不等，避免给每次调用加延迟）。 */
+
   awaitModels?: () => Promise<void>
   maxMode?: () => boolean
-  /** 「自适应 API 拦截」开关（设置节驱动，缺省开）。 */
+
   autoAdapt?: () => boolean
 }
 
-/** CodeBuddy 推理适配器：请求编排、流取消/超时、模型事实投影、11128 有界降级。 */
+
 export class CodeBuddyAdapter extends LlmAdapter {
-  /** 当前生效的阶梯位置（进程内；失败前进、成功记住）。见 `docs/spec/01-runtime-adaptation.md`。 */
+
   private rungIndex = 0
 
   constructor(private readonly config: CodeBuddyAdapterOptions) {
@@ -97,7 +87,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
       provider,
       id: model.id,
       name: model.name,
-      // 显式声明输入模态：text-only 是「明确的负能力」，视觉模型才带 image。
+
       inputModalities: model.input,
       ...(model.description === undefined ? {} : { description: model.description }),
     })))
@@ -125,9 +115,9 @@ export class CodeBuddyAdapter extends LlmAdapter {
     return info
   }
 
-  // 与官方基类同款命名（`_signal`）：本适配器不消费 prepare 期的取消信号
-  // （取消在 stream 期经 options.signal 处理），下划线前缀即表达「有意未用」。
-  override async prepareCall(provider: string, model: string, _signal?: AbortSignal): Promise<PreparedAdapterCall> {
+
+
+  override async prepareCall(provider: string, model: string): Promise<PreparedAdapterCall> {
     return {
       model: await this.resolveModel(provider, model),
       stream: options => this.stream(options),
@@ -166,16 +156,16 @@ export class CodeBuddyAdapter extends LlmAdapter {
     }
   }
 
-  /** 按指定正文变换构造请求体：阶梯每一格都从 options 重建，内容一致、只换变换。 */
+
   private async buildBody(options: GenerateOptions, neutralize: NeutralizeText): Promise<Record<string, unknown>> {
     const images = outboundImageCount(options.messages)
     let facts = this.config.models().find(entry => entry.id === options.model)
-    // 只有带图请求值得等目录落定（最多 IMAGE_FACTS_WAIT_MS）；普通请求不等待，避免给每次调用加延迟。
+
     if (images > 0 && facts === undefined) {
       await this.config.awaitModels?.()
       facts = this.config.models().find(entry => entry.id === options.model)
     }
-    // 先把图片能力判掉：纯文本 / 能力未知的模型不做无谓的附件读取与上游请求。
+
     assertImageCapable(options.model, facts, images)
     const body: Record<string, unknown> = {
       model: options.model,
@@ -186,7 +176,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
     if (options.temperature !== undefined) body.temperature = options.temperature
     if (options.maxTokens !== undefined) body.max_tokens = options.maxTokens
     if (options.stop !== undefined && options.stop.length > 0) body.stop = options.stop
-    // Max 模式（档位锁）开且模型有推理能力时强制 max，覆盖调用方档位。
+
     const effort = effectiveReasoningEffort(
       this.config.maxMode?.() ?? false,
       facts?.reasoning === true,
@@ -205,7 +195,7 @@ export class CodeBuddyAdapter extends LlmAdapter {
     const account = this.config.account()
     const adaptEnabled = this.config.autoAdapt?.() !== false
     const rungs = adaptEnabled ? ADAPTIVE_RUNGS : ADAPTIVE_RUNGS.slice(0, 1)
-    // 记住的成功位置可能超出本次可用阶梯（开关被关过）：夹到范围内。
+
     const start = Math.min(this.rungIndex, rungs.length - 1)
     let exhausted: { status: number; detail: ErrorDetail } | undefined
     const imageHint = outboundImageCount(options.messages) > 0
@@ -223,23 +213,23 @@ export class CodeBuddyAdapter extends LlmAdapter {
       })
       if (!response.ok) {
         const detail = await readErrorDetail(response)
-        // 只有渠道校验拒绝（400/11128）才降级；鉴权 / IP 白名单 / 参数错误重试无意义，原样透传。
+
         if (adaptEnabled && response.status === 400 && detail.code === 11128) {
           exhausted = { status: response.status, detail }
-          // 并发流可能重复前进一格：只是多一次同格重试，可接受（不做锁）。
+
           this.rungIndex = Math.min(index + 1, rungs.length - 1)
           continue
         }
         rejectionError(response.status, detail, imageHint && response.status === 400 ? IMAGE_REJECTION_HINT : undefined)
       }
       if (response.body === null) throw new LlmError('CodeBuddy 返回了空响应流', 'TRANSPORT')
-      // 该格可用：记住位置，后续请求直接从它开始。
+
       this.rungIndex = index
       yield* streamFrames(response.body, options.model, onActivity)
       return
     }
     if (exhausted !== undefined) rejectionError(exhausted.status, exhausted.detail, ADAPT_EXHAUSTED_HINT)
-    // 理论上不可达（rungs 至少一格，非 11128 分支已抛错）；防御性兜底。
+
     throw LlmError.fromFailure({ message: 'CodeBuddy 上游渠道校验拒绝', code: 'PROVIDER', status: 400 })
   }
 }

@@ -1,11 +1,4 @@
-/**
- * Fixed-position placement for a body-portaled panel anchored to an element.
- *
- * A picker/menu may live inside a scroll container (task lane, tab row): an in-flow popover gets
- * clipped by that overflow and squeezed by the card width. Portaling it to `document.body` plus
- * this hook keeps it viewport-fixed, flips it above the anchor when there is no room below, and
- * clamps it inside the visible area while the lane scrolls or the window resizes.
- */
+
 
 import { useLayoutEffect, useState } from 'react'
 import type { CSSProperties, RefObject } from 'react'
@@ -17,9 +10,9 @@ interface AnchoredPanelOptions {
   readonly gap?: number
   readonly margin?: number
   readonly maxWidth?: number
-  /** Measure the panel content instead of forcing maxWidth (menus with little content). */
+
   readonly fitContent?: boolean
-  /** Which panel edge the anchor aligns to. */
+
   readonly align?: 'start' | 'end'
 }
 
@@ -44,8 +37,8 @@ export function useAnchoredPanel({
       const available = Math.max(1, viewportWidth - margin * 2)
       let width = Math.min(maxWidth, available)
       if (fitContent) {
-        // Never write a width here: the panel uses its CSS content width, so opening it cannot
-        // flash from an old/fallback width to the measured one. We only measure for placement.
+
+
         panel.style.width = ''
         const measured = panel.getBoundingClientRect().width || panel.offsetWidth || Math.min(160, maxWidth)
         width = Math.min(Math.max(1, measured), maxWidth, available)

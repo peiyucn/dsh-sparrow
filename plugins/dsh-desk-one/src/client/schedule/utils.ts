@@ -1,4 +1,4 @@
-/** Pure client-side date/event helpers for the schedule page (unit-tested). */
+
 
 import type { DeskCalendar, DeskEvent } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
@@ -7,7 +7,7 @@ export type ScheduleViewName = 'list' | 'month' | 'week'
 
 const DAY_MS = 86_400_000
 
-/** Local midnight of the given date. */
+
 export function startOfLocalDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate())
 }
@@ -16,19 +16,14 @@ export function addDays(date: Date, days: number): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days)
 }
 
-/** Local date key `YYYY-MM-DD` (not UTC, so late-evening events stay on their local day). */
+
 export function dayKey(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${date.getFullYear()}-${month}-${day}`
 }
 
-/**
- * 24h wall clock, locale-independent so the UI never mixes AM/PM with a Chinese shell.
- *
- * Named `formatClock24h` rather than `formatTime` to stay distinct from the locale-aware helper in
- * `app/utils.ts`; the two intentionally produce different text for the same instant.
- */
+
 export function formatClock24h(iso: string): string {
   const date = new Date(iso)
   const hours = String(date.getHours()).padStart(2, '0')
@@ -36,13 +31,13 @@ export function formatClock24h(iso: string): string {
   return `${hours}:${minutes}`
 }
 
-/** Comma-separated weekday labels (Chinese single-character days or English short names) parsed from the locale dictionary. */
+
 export function weekdayLabels(value: string): string[] {
   return value.split(',').map(part => part.trim())
 }
 
 export function weekdayLabel(date: Date, labels: readonly string[]): string {
-  // Labels are Monday-first (Chinese convention), so map Sunday=0 to the last slot.
+
   return labels[(date.getDay() + 6) % 7] ?? ''
 }
 
@@ -50,7 +45,7 @@ export function formatDateLabel(date: Date, t: DeskTranslator): string {
   return t('schedule.dateFormat', { month: date.getMonth() + 1, day: date.getDate() })
 }
 
-/** Full date for the calendar view's range label, so the exact day is unambiguous. */
+
 export function formatFullDateLabel(date: Date, t: DeskTranslator): string {
   return t('schedule.dateFormatFull', { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() })
 }
@@ -61,17 +56,14 @@ export function formatMonthLabel(date: Date, t: DeskTranslator): string {
   return t('schedule.monthLabel', { year: date.getFullYear(), month })
 }
 
-/** Week start (Monday) of the given date, at local midnight. */
+
 function weekStartOf(date: Date): Date {
   return addDays(startOfLocalDay(date), -((date.getDay() + 6) % 7))
 }
 
-/**
- * ISO-8601 week number (weeks start Monday, week 1 is the one holding the first Thursday).
- * The week grid is Monday-first, so this is the numbering that matches what the user sees.
- */
+
 export function isoWeekNumber(date: Date): number {
-  // Shift to the Thursday of this ISO week, then count weeks from the first Thursday of the year.
+
   const thursday = addDays(startOfLocalDay(date), 3 - ((date.getDay() + 6) % 7))
   const firstThursday = (() => {
     const jan4 = new Date(thursday.getFullYear(), 0, 4)
@@ -87,7 +79,7 @@ export function formatDayTitle(date: Date, today: Date, labels: { today: string;
   return format(date)
 }
 
-/** Month grid range (local): first visible week (Monday) .. Monday after the last visible week. */
+
 export function monthRange(cursor: Date): { from: Date; to: Date } {
   const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
   const from = weekStartOf(first)
@@ -96,31 +88,27 @@ export function monthRange(cursor: Date): { from: Date; to: Date } {
   return { from, to }
 }
 
-/** Week grid range (local Monday .. next Monday, exclusive). */
+
 export function weekRange(cursor: Date): { from: Date; to: Date } {
   const from = weekStartOf(cursor)
   return { from, to: addDays(from, 7) }
 }
 
-/** Agenda window from a local day; `days` is inclusive of the start day. */
+
 export function listRange(from: Date, days: number): { from: Date; to: Date } {
   const start = startOfLocalDay(from)
   return { from: start, to: addDays(start, days) }
 }
 
-/** Stable per-event key for grouping (local day of the event's start). */
+
 export function keyOfEvent(event: DeskEvent): string {
   return dayKey(new Date(event.start))
 }
 
-/** Guard against absurd spans (a bad DTEND must not loop thousands of days). */
+
 const MAX_SPAN_DAYS = 366
 
-/**
- * Every day an event covers, so a multi-day event appears on each of its days instead of only
- * on the start day. All-day events carry calendar dates in UTC and their end is exclusive
- * (ICS DTEND), so `24..27` yields 24/25/26/27; timed events that cross midnight cover both days.
- */
+
 export function eventDayKeys(event: DeskEvent): string[] {
   const startMs = Date.parse(event.start)
   if (!Number.isFinite(startMs)) return []
@@ -139,7 +127,7 @@ export function eventDayKeys(event: DeskEvent): string[] {
     return keys.length === 0 ? [firstKey] : keys
   }
 
-  // Timed: walk local calendar days; the last covered day is the one holding `end - 1ms`.
+
   const last = new Date(Number.isFinite(endMs) && endMs > startMs ? endMs - 1 : startMs)
   const keys: string[] = []
   for (let day = startOfLocalDay(start); day <= last && keys.length < MAX_SPAN_DAYS; day = addDays(day, 1)) {
@@ -148,31 +136,28 @@ export function eventDayKeys(event: DeskEvent): string[] {
   return keys.length === 0 ? [dayKey(start)] : keys
 }
 
-/** True when the event covers the given day key (single-day events match their start day only). */
+
 export function coversDayKey(event: DeskEvent, key: string): boolean {
   return eventDayKeys(event).includes(key)
 }
 
-/** True when an event spans more than one day, so calendar grids draw it as a bar, not a cell chip. */
+
 export function isMultiDay(event: DeskEvent): boolean {
   return eventDayKeys(event).length > 1
 }
 
-/** A multi-day event clipped to one week/month row: `startIndex` is 0-based within `days`. */
+
 export interface SpanBar {
   readonly event: DeskEvent
   readonly startIndex: number
   readonly span: number
-  /** The event started before this row's first day (draw the left edge open). */
+
   readonly continuesBefore: boolean
-  /** The event ends after this row's last day (draw the right edge open). */
+
   readonly continuesAfter: boolean
 }
 
-/**
- * Multi-day events as continuous bars across the given day columns, clipped per row. Single-day
- * events are not returned -- they stay inside their day cell.
- */
+
 export function spanBars(events: readonly DeskEvent[], days: readonly Date[]): SpanBar[] {
   if (days.length === 0) return []
   const keys = days.map((day) => dayKey(day))
@@ -207,7 +192,7 @@ export function spanBars(events: readonly DeskEvent[], days: readonly Date[]): S
     || left.event.start.localeCompare(right.event.start))
 }
 
-/** Group events into local days covering [today, today + days). Days without events stay empty. */
+
 export function groupByDay(events: readonly DeskEvent[], today: Date, days: number): Array<{ key: string; date: Date; events: DeskEvent[] }> {
   const start = startOfLocalDay(today)
   const groups = Array.from({ length: days }, (_, index) => {
@@ -216,14 +201,14 @@ export function groupByDay(events: readonly DeskEvent[], today: Date, days: numb
   })
   const byKey = new Map(groups.map(group => [group.key, group]))
   for (const event of events) {
-    // A multi-day event belongs to every day it covers, not just its start day.
+
     for (const key of eventDayKeys(event)) byKey.get(key)?.events.push(event)
   }
   for (const group of groups) group.events.sort((left, right) => left.start.localeCompare(right.start))
   return groups
 }
 
-/** Week grid geometry in percentages of the full day so the grid is a fixed 24h canvas. */
+
 interface WeekBlock {
   readonly event: DeskEvent
   readonly dayIndex: number
@@ -233,7 +218,7 @@ interface WeekBlock {
   readonly lanes: number
 }
 
-/** Position events inside a week grid; overlapping events share the column in side-by-side lanes. */
+
 export function weekBlocks(events: readonly DeskEvent[], from: Date): WeekBlock[] {
   const weekStart = startOfLocalDay(from).getTime()
   const byDay = new Map<number, DeskEvent[]>()
@@ -282,7 +267,7 @@ export function weekBlocks(events: readonly DeskEvent[], from: Date): WeekBlock[
   return blocks
 }
 
-/** Ids of busy timed events that overlap another busy event on the same local day. */
+
 export function conflictIds(events: readonly DeskEvent[]): Set<string> {
   const byDay = new Map<string, DeskEvent[]>()
   for (const event of events) {

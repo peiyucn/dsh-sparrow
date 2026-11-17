@@ -1,9 +1,4 @@
-/**
- * Task board view: three lanes with first-class groups, pointer dragging for cards and for whole
- * groups (a ghost follows the pointer, invalid drops fly back), double-click-to-add and the
- * archive list. Data + board state are owned by DeskOnePage so the shared header can host the
- * view actions; this component stays a controlled renderer.
- */
+
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
@@ -26,7 +21,7 @@ interface TaskBoardProps {
   readonly data: TasksData
   readonly groupsData: GroupsData
   readonly board: TaskBoardApi
-  /** Optional session services facade; disabled when the host doesn't expose them. */
+
   readonly sessionLink: SessionLinkApi
 }
 
@@ -35,7 +30,7 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
   const [groupDrag, setGroupDrag] = useState<DeskTaskGroup | null>(null)
   const [groupDrop, setGroupDrop] = useState<GroupDropTarget | null>(null)
-  /** Below the threshold the three lanes collapse into count-only columns (no horizontal scroll). */
+
   const [compact, setCompact] = useState(false)
   const lanesRef = useRef<HTMLDivElement | null>(null)
 
@@ -49,7 +44,7 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
     return () => { observer.disconnect() }
   }, [data.loading, groupsData.loading])
 
-  /** Resolve a card drop: a group's card list, or the lane's shared block sequence. */
+
   const resolveCardDrop = useCallback((x: number, y: number, movingTaskId: string): DropTarget | null => {
     const element = document.elementFromPoint(x, y) as HTMLElement | null
     const lane = element?.closest<HTMLElement>('[data-lane]')
@@ -72,8 +67,8 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
       }
       return { status, groupId, index }
     }
-    // Ungrouped position: the pointer selects an insertion index in the unified block list,
-    // excluding the card being dragged (its block still occupies its slot).
+
+
     const blocks = [...lane.querySelectorAll<HTMLElement>('.dsh-task-block')]
     let index = 0
     for (const block of blocks) {
@@ -85,7 +80,7 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
     return { status, index, block: true }
   }, [])
 
-  /** Resolve the lane plus block insertion position under the pointer (group drag). */
+
   const resolveGroupDrop = useCallback((x: number, y: number, excludeGroupId: string): GroupDropTarget | null => {
     const element = document.elementFromPoint(x, y) as HTMLElement | null
     const lane = element?.closest<HTMLElement>('[data-lane]')
@@ -94,7 +89,7 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
     if (status === undefined) return null
     let index = 0
     for (const block of lane.querySelectorAll<HTMLElement>('.dsh-task-block')) {
-      // Skip the dragged group's block: index is an insertion into the remaining list.
+
       if (block.querySelector<HTMLElement>('.dsh-task-group')?.dataset.groupId === excludeGroupId) continue
       const rect = block.getBoundingClientRect()
       if (y < rect.top + rect.height / 2) break
@@ -103,7 +98,7 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
     return { status, index }
   }, [])
 
-  /** Whole-card pointer drag: a 5px threshold separates a click (edit) from a drag (move). */
+
   const startDrag = useCallback((task: DeskTask, event: ReactPointerEvent<HTMLElement>): void => {
     const target = event.target as HTMLElement
     if (event.button !== 0 || target.closest('input,textarea,button,select')) return
@@ -126,8 +121,8 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
       setDraggingId(task.id)
     }
     const onMove = (moveEvent: PointerEvent): void => {
-      // Releasing the mouse outside the window delivers no `pointerup`: the next move with no
-      // pressed button is that missed release, so cancel instead of leaving the drag armed.
+
+
       if (moveEvent.buttons === 0) { onCancel(); return }
       if (!moved) {
         if (Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) < 5) return
@@ -149,7 +144,7 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
       setDraggingId(null)
       setDropTarget(null)
     }
-    /** A real drag must not leak into a click that would open a field for editing. */
+
     const suppressNextClick = (): void => {
       const blocker = (clickEvent: MouseEvent): void => {
         clickEvent.stopPropagation()
@@ -170,7 +165,7 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
     }
     const onFinish = (): void => {
       cleanup()
-      // No threshold crossed: this was a click, so TaskCard opens the clicked field for editing.
+
       if (!moved || ghost === null) return
       suppressNextClick()
       if (latest === null) {
@@ -194,10 +189,7 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
     window.addEventListener('keydown', onKey)
   }, [board, resolveCardDrop])
 
-  /**
-   * Whole-group drag: same 5px threshold and ghost model as a card. Drop on the same lane
-   * reorders blocks in the lane sequence; another lane moves the whole group and cascades its cards.
-   */
+
   const startGroupDrag = useCallback((group: DeskTaskGroup, event: ReactPointerEvent<HTMLElement>): void => {
     const target = event.target as HTMLElement
     if (event.button !== 0 || target.closest('input,textarea,button')) return
@@ -220,7 +212,7 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
       setGroupDrag(group)
     }
     const onMove = (moveEvent: PointerEvent): void => {
-      // Same missed-release handling as the card drag: cancel once no button is pressed anymore.
+
       if (moveEvent.buttons === 0) { onCancel(); return }
       if (!moved) {
         if (Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) < 5) return
@@ -252,7 +244,7 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
     }
     const onFinish = (): void => {
       cleanup()
-      // Below the threshold this was a click (group name double-click renames, buttons click).
+
       if (!moved || ghost === null) return
       if (latest === null) {
         flyBack()
@@ -279,15 +271,15 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
   const actionError = data.actionError ?? groupsData.actionError
   const countText = (count: number): string => count === 1 ? t('task.countOne') : t('task.count', { count })
 
-  // Session links resolve live; a linked id that the host list no longer knows stays visible as
-  // "unavailable" instead of being silently dropped from the card.
+
+
   const sessionSnapshot = useSessionLinks(sessionLink)
   const sessionById = useMemo(
     () => new Map(sessionSnapshot.sessions.map(session => [session.id, session])),
     [sessionSnapshot.sessions],
   )
-  // Same session universe as the composer's `@` source (the host session list): subagent
-  // sessions are included too; archived ones stay selectable and render with the neutral status tint.
+
+
   const sessionOptions = sessionSnapshot.sessions
   const sessionsFor = useCallback((ids: readonly string[]): readonly SessionChipInfo[] => ids.map(id =>
     sessionById.get(id) ?? {
@@ -299,13 +291,13 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
       subagent: false,
     }), [sessionById, t])
   const linkSessions = useCallback((task: DeskTask, sessionIds: readonly string[]): void => {
-    // Optimistic: the picker can be clicked again before the host round-trip lands, and the patch
-    // replaces the whole list — without this the second click would overwrite the first one.
+
+
     data.setTasks(current => withLinkedSessions(current, task.id, sessionIds))
     data.savePatch(task, { sessionIds })
   }, [data.savePatch, data.setTasks])
 
-  /** Archived groups own archived cards: deleting the group also deletes those cards host-side. */
+
   const deleteArchivedGroup = (group: DeskTaskGroup): void => {
     data.setTasks(current => current.filter(task => task.groupId !== group.id))
     groupsData.removeGroup(group)

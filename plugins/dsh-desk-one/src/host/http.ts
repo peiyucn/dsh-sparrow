@@ -1,4 +1,4 @@
-/** Host-half HTTP primitives: JSON envelopes, body reading and the shared error type. */
+
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
@@ -13,10 +13,10 @@ type DeskErrorCode =
   | 'UNKNOWN_NOTE'
   | 'UNKNOWN_WORKSPACE'
   | 'STORAGE_ERROR'
-  /* notebook */
+
   | 'INVALID_NOTEBOOK'
   | 'NOTEBOOK_UNAVAILABLE'
-  /* schedule */
+
   | 'INVALID_SCHEDULE'
   | 'UNKNOWN_CALENDAR'
   | 'SCHEDULE_NOT_CONNECTED'
@@ -30,17 +30,14 @@ export class DeskError extends Error {
   }
 }
 
-/**
- * A feature error that already carries its wire mapping. `sendError` matches this shape instead of
- * importing each feature's error class, so the shared HTTP layer stays independent of the features.
- */
+
 export interface DeskHttpFailure {
   readonly code: string
   readonly message: string
   readonly status: number
 }
 
-/** Whether one thrown value is a feature error with its own HTTP mapping. */
+
 function isHttpFailure(error: unknown): error is DeskHttpFailure {
   if (!(error instanceof Error)) return false
   const candidate = error as Partial<DeskHttpFailure>
@@ -56,8 +53,7 @@ export function sendJson(res: ServerResponse, status: number, payload: unknown):
   res.end(body)
 }
 
-/** One error funnel: model errors map to semantic status codes; unknown errors are logged and
- * answered with 500 so internals never leak to the browser. */
+
 export function sendError(ctx: Context, res: ServerResponse, error: unknown): void {
   if (error instanceof DeskModelError) {
     const status = error.code === 'REVISION_CONFLICT'
@@ -71,8 +67,8 @@ export function sendError(ctx: Context, res: ServerResponse, error: unknown): vo
     sendJson(res, error.status, { error: { code: error.code, message: error.message } })
     return
   }
-  // Feature errors that own their HTTP mapping (session archive, schedule adapters). They expose
-  // `{ code, status, message }` and are matched structurally; the shared layer does not know them.
+
+
   if (isHttpFailure(error)) {
     sendJson(res, error.status, { error: { code: error.code, message: error.message } })
     return
@@ -82,11 +78,7 @@ export function sendError(ctx: Context, res: ServerResponse, error: unknown): vo
   sendJson(res, 500, { error: { code: 'STORAGE_ERROR', message: '存储或路由内部错误' } })
 }
 
-/**
- * Read and parse a JSON body; oversized, unreadable or malformed input throws {@link DeskError}.
- * @param maxBytes - transport cap; routes that carry a bounded-but-large payload (a note body up to
- *   the reviewable file size) raise it explicitly, every other route keeps the default.
- */
+
 export async function readJsonBody(req: IncomingMessage, maxBytes = MAX_BODY_BYTES): Promise<unknown> {
   const chunks: Buffer[] = []
   let size = 0
@@ -110,7 +102,7 @@ export async function readJsonBody(req: IncomingMessage, maxBytes = MAX_BODY_BYT
   }
 }
 
-/** Assert the body is a JSON object; each route then reads its own fields from contract.ts. */
+
 export function bodyObject<T extends object>(value: unknown, message: string): T {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new DeskError('BAD_BODY', message)

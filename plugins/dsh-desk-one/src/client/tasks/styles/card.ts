@@ -1,4 +1,4 @@
-/** Task cards: text, autogrowing inputs, linked-session chips, colour stack and due date. */
+
 
 export const TASK_CARD_CSS = `
 /* Card: the whole card is the drag handle; inputs keep their own gestures. */

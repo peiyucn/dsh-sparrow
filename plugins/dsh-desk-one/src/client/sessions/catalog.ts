@@ -1,16 +1,16 @@
-/** Pure grouping/tree helpers for the Sessions view (no React, unit-tested separately). */
+
 
 import { nestTree } from '../../tree.js'
 import type { SessionChipInfo, SessionWorkspaceGroupInfo } from './contract.js'
 
 interface SessionWorkspaceGroup {
-  /** Stable key: workspace id, cwd fallback, or '' for sessions without both. */
+
   readonly key: string
-  /** Display label: workspace title, then last path segment; empty means "no workspace". */
+
   readonly label: string
-  /** All sessions in the group (flat, for counts and compatibility). */
+
   readonly sessions: readonly SessionChipInfo[]
-  /** Parent-first rows: subagents follow their parent at depth 1, same nesting as the archive tree. */
+
   readonly rows: readonly ActiveSessionRow[]
 }
 
@@ -20,7 +20,7 @@ interface ActiveSessionRow {
   readonly childCount: number
 }
 
-/** Last path segment for either Windows or POSIX cwd strings. */
+
 export function workspaceLabel(cwd: string | undefined): string {
   if (cwd === undefined || cwd === '') return ''
   const trimmed = cwd.replace(/[\\/]+$/u, '')
@@ -34,11 +34,7 @@ function byActivity(left: SessionChipInfo, right: SessionChipInfo): number {
     || left.title.localeCompare(right.title)
 }
 
-/**
- * Active catalog grouped by host Workspace first (the registry's title/sessionIds), falling back
- * to the session's cwd basename for sessions outside any workspace. Subagent sessions are nested
- * under their parent (same lineage rule as the archive tree), never shown as a separate group.
- */
+
 export function activeSessionGroups(
   sessions: readonly SessionChipInfo[],
   workspaces: readonly SessionWorkspaceGroupInfo[] = [],
@@ -77,4 +73,3 @@ export function activeSessionGroups(
     .map(([key, group]) => ({ key, label: group.label, sessions: [...group.sessions].sort(byActivity), rows: group.rows }))
     .sort((left, right) => left.label.localeCompare(right.label) || left.key.localeCompare(right.key))
 }
-

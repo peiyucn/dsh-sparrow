@@ -1,11 +1,11 @@
-#!/usr/bin/env node
-/** 逐个插件运行验证：默认 typecheck + build + test；`--typecheck` / `--build` / `--test` 只跑单项。 */
+
+
 import { spawnSync } from 'node:child_process'
 import { join } from 'node:path'
-// 活跃 / 已退役插件名单是**单一真值**（与 check-dsh-pin.mjs 共用同一份，防两边漂移）。
+
 import { activePluginNames, repoRoot } from './plugin-set.mjs'
 
-const mode = process.argv[2] // undefined | '--typecheck' | '--build' | '--test'
+const mode = process.argv[2]
 
 const root = repoRoot
 const plugins = activePluginNames(root)

@@ -1,10 +1,4 @@
-/**
- * Owns the note collection: loading, optimistic patches and the per-note write chain.
- *
- * Every save of one note is serialized through a small promise chain so that z / position /
- * size / body writes cannot race each other; the queue always reads the latest revision,
- * which is what makes the optimistic `revision` guard work in practice.
- */
+
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
@@ -32,16 +26,16 @@ export interface NotesData {
 }
 
 export function useNotesData(t: DeskTranslator, actions: Actions): NotesData {
-  // Destructure so the memoized callbacks depend on stable function identities, not the wrapper.
+
   const { listNotes, updateNote, deleteNote } = actions
   const [notes, setNotes] = useState<readonly DeskNote[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
-  /** Latest notes for queued writes (they outlive the render that created them). */
+
   const notesRef = useRef<readonly DeskNote[]>(notes)
   notesRef.current = notes
-  /** One write chain per note id. */
+
   const writeChains = useRef(new Map<string, Promise<void>>())
   const loadTickets = useRef(createLoadTickets())
 
@@ -82,7 +76,7 @@ export function useNotesData(t: DeskTranslator, actions: Actions): NotesData {
     setNotes(current => current.filter(note => note.id !== id))
   }, [])
 
-  /** Local state is updated optimistically elsewhere; this only handles persistence + feedback. */
+
   const savePatch = useCallback((note: DeskNote, patch: Patch): void => {
     enqueueWrite(note.id, async () => {
       const current = notesRef.current.find(item => item.id === note.id)
@@ -98,17 +92,14 @@ export function useNotesData(t: DeskTranslator, actions: Actions): NotesData {
     })
   }, [enqueueWrite, reload, replaceNote, t, updateNote])
 
-  /**
-   * Persist a freshly created note's layer. The create call accepts z, but an older host may
-   * ignore it; a follow-up patch keeps the "new note on top" promise without requiring a restart.
-   */
+
   const persistZ = useCallback((note: DeskNote, layer: number): void => {
     enqueueWrite(note.id, async () => {
       try {
         const updated = await updateNote({ id: note.id, expectedRevision: note.revision, patch: { z: layer } })
         replaceNote({ ...updated, z: updated.z ?? layer })
       } catch {
-        // Keep the local layer; the next drag/click will retry.
+
       }
     })
   }, [enqueueWrite, replaceNote, updateNote])

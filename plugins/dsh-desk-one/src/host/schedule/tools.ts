@@ -1,7 +1,4 @@
-/**
- * Schedule tools for the agent surface (read-only): the same mirror the page renders, queried by
- * range. Sync is exposed as an explicit action so the model can refresh before answering.
- */
+
 
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'

@@ -1,12 +1,4 @@
-/**
- * Minimal CalDAV client for the two read-only CalDAV sources.
- *
- * Only the three request shapes the sync needs are implemented: discover the principal + calendar
- * home via `/.well-known/caldav`, list calendars under the home, and query VEVENTs in a time
- * window. Redirects are followed by hand (301/302/307/308, method and body preserved) so a
- * discovery redirect cannot silently turn the PROPFIND into a GET, and so the Basic credential is
- * never forwarded to a host outside the same host / iCloud shard family.
- */
+
 
 import { SCHEDULE_REQUEST_TIMEOUT_MS } from '../../constants.js'
 import { ScheduleError } from './types.js'
@@ -22,7 +14,7 @@ interface CalDavAuth {
 export interface CalDavDeps {
   fetchImpl?: typeof fetch
   timeoutMs?: number
-  /** Overrides the provider inferred from the home URL host (self-hosted CalDAV / tests). */
+
   provider?: RemoteCalendar['provider']
 }
 
@@ -38,10 +30,10 @@ interface CalDavEventResource {
 }
 
 const WELL_KNOWN_PATH = '/.well-known/caldav'
-/** Documented WeCom fallback home (spec 05 §5 marks the discovery chain as unverified). */
+
 const WECOM_HOME_FALLBACK_PATH = '/calendar/'
 const MAX_REDIRECTS = 5
-/** WeCom serves one .ics per GET; a small worker pool keeps a large calendar's sync bounded. */
+
 const EVENT_FETCH_CONCURRENCY = 6
 const REDIRECT_STATUSES = new Set([301, 302, 307, 308])
 
@@ -68,7 +60,7 @@ const LIST_CALENDARS_BODY = `<?xml version="1.0" encoding="utf-8"?>
   </d:prop>
 </d:propfind>`
 
-/** `Calendar-data` is requested bare on purpose: a nested comp filter makes iCloud return empty. */
+
 function buildCalendarQueryBody(window: PullWindow): string {
   return `<?xml version="1.0" encoding="utf-8"?>
 <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
@@ -87,7 +79,7 @@ function buildCalendarQueryBody(window: PullWindow): string {
 }
 
 interface HttpText {
-  /** URL after redirects; relative hrefs are resolved against it. */
+
   url: string
   status: number
   contentType: string
@@ -100,7 +92,7 @@ interface CalDavRequestInit {
   body?: string
 }
 
-/** Discover the principal and the calendar home URL. */
+
 export async function discoverCalDav(
   baseUrl: string,
   auth: CalDavAuth,
@@ -122,7 +114,7 @@ export async function discoverCalDav(
   throw new ScheduleError('UNSUPPORTED', `CalDAV 发现失败：未找到当前账号的日历家目录${detail}`)
 }
 
-/** List the calendars under a home URL; `remoteId` is the absolute calendar URL used for queries. */
+
 export async function listCalDavCalendars(
   homeUrl: string,
   auth: CalDavAuth,
@@ -151,7 +143,7 @@ export async function listCalDavCalendars(
   return calendars
 }
 
-/** Query the VEVENT resources of one calendar inside the window. */
+
 export async function queryCalDavEvents(
   calendarUrl: string,
   window: PullWindow,
@@ -173,8 +165,8 @@ export async function queryCalDavEvents(
     if (item.href === '') continue
     const url = resolveHref(item.href, response.url)
     if (url === null) continue
-    // WeCom's REPORT also returns the collection self-entry (no etag, no calendar-data);
-    // GET on that collection is a 403. Real event resources always carry an ETag here.
+
+
     if (url.href === calendar.href || url.pathname.endsWith('/')) continue
     const etag = normalizeEtag(item.props.getetag)
     const ics = (item.props['calendar-data'] ?? '').trim()
@@ -185,8 +177,8 @@ export async function queryCalDavEvents(
     if (etag === undefined) continue
     pending.push({ url, etag })
   }
-  // WeCom serves one .ics per GET (no multiget); bound the fan-out so a large calendar still
-  // finishes well inside the client's sync budget.
+
+
   const fetched = await mapWithConcurrency(pending, EVENT_FETCH_CONCURRENCY, async item => {
     const ics = await fetchCalendarObject(item.url, auth, deps)
     return ics === null ? null : { href: item.url.href, etag: item.etag, ics }
@@ -195,7 +187,7 @@ export async function queryCalDavEvents(
   return events
 }
 
-/** Map with a fixed concurrency, preserving input order in the result. */
+
 async function mapWithConcurrency<T, R>(
   items: readonly T[],
   limit: number,
@@ -217,8 +209,8 @@ async function mapWithConcurrency<T, R>(
 }
 
 async function discoverPrincipal(origin: URL, auth: CalDavAuth, deps: CalDavDeps, trace: string[] = []): Promise<string | null> {
-  // Standard chain first, then the origin itself: some servers answer /.well-known with 404 but
-  // still expose current-user-principal at the root.
+
+
   const fromWellKnown = await findHrefFromPropfind(
     new URL(WELL_KNOWN_PATH, origin), '0', PRINCIPAL_PROPFIND_BODY, 'current-user-principal', auth, deps, trace,
   )
@@ -232,7 +224,7 @@ async function findCalendarHome(principalUrl: string, auth: CalDavAuth, deps: Ca
   )
 }
 
-/** iCloud home lives at `/{dsid}/calendars/`; derive it when the principal probe omits the home. */
+
 function iCloudHomeFromPrincipal(principalUrl: string): string | null {
   const url = new URL(principalUrl)
   if (!/\/principal\/?$/u.test(url.pathname)) return null
@@ -265,7 +257,7 @@ async function fetchCalendarObject(url: URL, auth: CalDavAuth, deps: CalDavDeps)
     method: 'GET',
     headers: { accept: 'text/calendar, text/plain; q=0.9, */*; q=0.1' },
   }, auth, deps)
-  // A vanished object (deleted between REPORT and GET) must not fail the whole calendar.
+
   if (response.status === 404 || response.status === 410) return null
   ensureSuccess(response, 'CalDAV 读取事件')
   if (looksLikeHtml(response)) {
@@ -288,10 +280,7 @@ function requestPropfind(
   }, auth, deps)
 }
 
-/**
- * One HTTP request with Basic auth, timeout and manual redirect following.
- * Never logs or echoes the credential; only the public URL/status appears in error messages.
- */
+
 async function requestText(
   target: URL,
   init: CalDavRequestInit,
@@ -344,7 +333,7 @@ async function discardBody(response: Response): Promise<void> {
   try {
     await response.body?.cancel()
   } catch {
-    // The body may already be consumed or unavailable; nothing to release in that case.
+
   }
 }
 
@@ -353,7 +342,7 @@ function assertRedirectAllowed(from: URL, to: URL): void {
     throw new ScheduleError('UNSUPPORTED', '拒绝 CalDAV 从 https 降级到 http 的重定向')
   }
   if (from.hostname === to.hostname) return
-  // iCloud answers on a shard host (`pNN-caldav.icloud.com`); only hop inside that family.
+
   if (isICloudHost(from.hostname) && isICloudHost(to.hostname)) return
   throw new ScheduleError('UNSUPPORTED', '拒绝把 CalDAV 凭据转发到未允许的主机')
 }
@@ -389,7 +378,7 @@ function basicAuthorization(auth: CalDavAuth): string {
   if (user === '' || password === '') {
     throw new ScheduleError('AUTH_EXPIRED', '缺少 CalDAV 账号或同步密码，请重新获取', 'SCHEDULE_AUTH_EXPIRED')
   }
-  // Host runs on Node; Buffer is available and avoids the deprecated btoa/DOM dependency.
+
   return `Basic ${Buffer.from(`${user}:${password}`, 'utf8').toString('base64')}`
 }
 
@@ -404,7 +393,7 @@ function parseHttpUrl(raw: string, what: string): URL {
     throw new ScheduleError('UNSUPPORTED', `${what}只支持 http(s)`)
   }
   if (url.username !== '' || url.password !== '') {
-    // Avoid user-embedded credentials: CalDAV auth goes through the Authorization header only.
+
     throw new ScheduleError('UNSUPPORTED', `${what}不能内嵌凭据`)
   }
   return url
@@ -446,7 +435,7 @@ function lastPathSegment(pathname: string): string {
   try {
     return decodeURIComponent(last)
   } catch {
-    // A malformed escape in a server href is not worth failing the calendar list over.
+
     return last
   }
 }

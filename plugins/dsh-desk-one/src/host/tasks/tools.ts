@@ -1,9 +1,4 @@
-/**
- * Task tools for the agent surface.
- *
- * They share the DeskStore with the board UI: same validation, same revision guard. Listing is
- * limited by default so a large board cannot flood the model context.
- */
+
 
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -11,7 +6,7 @@ import { NOTE_COLORS, PACKAGE_NAME, TASK_STATUSES } from '../../constants.js'
 import { textOutput, toolError } from '../tools/shared.js'
 import type { DeskStore } from '../store.js'
 
-/** Register the five task tools; the board UI refreshes on its next pull. */
+
 export function registerTaskTools(ctx: Context, store: DeskStore): void {
   ctx.tools.register(defineTool({
     name: 'desk_task_add',

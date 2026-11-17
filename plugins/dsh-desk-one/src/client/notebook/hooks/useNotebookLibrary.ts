@@ -1,8 +1,4 @@
-/**
- * Notebook library data: the host state snapshot, submitted history, and the workspace the linked
- * root belongs to. Loaded when the notebook tab becomes visible; a fresh scan is cheap because the
- * host caches it for 30s.
- */
+
 
 import { useCallback, useEffect, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
@@ -12,7 +8,7 @@ import type { NotebookApi } from '../api.js'
 import type { WorkspaceAccess, WorkspacePathView } from '../workspaces.js'
 import { findWorkspaceForPath } from '../workspaces.js'
 
-/** Library data + the setters the action layer needs while it mutates it. */
+
 export interface NotebookLibrary {
   readonly state: NotebookStateResponse | null
   readonly history: readonly ReviewHistoryEntry[]
@@ -31,7 +27,7 @@ export interface NotebookLibrary {
   readonly setBusy: Dispatch<SetStateAction<boolean>>
 }
 
-/** Load the notebook library and resolve its workspace. */
+
 export function useNotebookLibrary(input: {
   readonly active: boolean
   readonly notebook: NotebookApi
@@ -58,7 +54,7 @@ export function useNotebookLibrary(input: {
     }
   }, [notebook])
 
-  // Load when the tab becomes visible; a fresh scan is cheap (the host caches it for 30s).
+
   useEffect(() => {
     if (active) void reload()
   }, [active, reload])

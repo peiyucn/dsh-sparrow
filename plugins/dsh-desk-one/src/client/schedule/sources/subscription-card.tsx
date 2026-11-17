@@ -1,4 +1,4 @@
-/** Provider-agnostic ICS subscriptions: several URLs, each one its own read-only calendar. */
+
 
 import { useState } from 'react'
 import { SourceIssues } from './issues.js'
@@ -59,8 +59,8 @@ export function SubscriptionCard(props: {
       {sources.length === 0 ? <p className="dsh-desk-schedule-form-note">{t('schedule.subscriptionEmpty')}</p> : null}
       {sources.map(source => {
         const own = calendars.filter(calendar => calendar.sourceId === source.id)
-        // The status dot belongs to each subscription: one ICS card can hold several, and only the
-        // individual feed knows whether its own pull failed.
+
+
         const health = sourceHealth(source, own)
         return (
           <div key={source.id} className="dsh-desk-schedule-subscription">

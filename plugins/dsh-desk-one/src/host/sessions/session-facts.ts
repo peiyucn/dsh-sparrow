@@ -1,7 +1,4 @@
-/**
- * Pure parsers for session rows: stray detection, blank projections and the header/stat facts the
- * archive views show. Rows come from the host session service; nothing here touches the disk.
- */
+
 
 export function straySessionIds(
   persistedIds: readonly string[],
@@ -13,11 +10,7 @@ export function straySessionIds(
   return persistedIds.filter(id => !archived.has(id) && !attached.has(id))
 }
 
-/**
- * Parse the "blank session" signal from an official projection row (session_projcache row shape: { version, record: { identity, rows } }):
- * blank = sessionListMetadata.blank === true or sessionStats.turns === 0.
- * A missing row / malformed shape / explicitly non-blank all return undefined (callers conservatively treat that as non-blank).
- */
+
 export function parseBlankProjection(row: unknown): { blank: true } | undefined {
   if (typeof row !== 'object' || row === null || Array.isArray(row)) return undefined
   const outer = row as Record<string, unknown>
@@ -36,7 +29,7 @@ export function parseBlankProjection(row: unknown): { blank: true } | undefined 
   return undefined
 }
 
-/** Session stats and list metadata (display only; v5/v6 dual shape, same record ?? outer fallback as parseBlankProjection). */
+
 export interface SessionFacts {
   readonly turns?: number
   readonly decodeTokens?: number
@@ -66,5 +59,3 @@ export function parseSessionFacts(row: unknown): SessionFacts | undefined {
   }
   return facts
 }
-
-/** Structural subset of SessionHeader needed to build the tree (pure module, zero dependencies; the host side passes the real header). */

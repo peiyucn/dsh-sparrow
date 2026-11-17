@@ -1,7 +1,4 @@
-/**
- * Trash view: a paged list of soft-deleted notes with restore / delete-forever actions.
- * Pagination keeps the rendered row count small (TRASH_PAGE_SIZE); deleting here is permanent.
- */
+
 
 import type { ReactElement } from 'react'
 import type { DeskNote } from '../../../contract.js'

@@ -1,4 +1,4 @@
-/** Locale fragment: task board (lanes, groups, due dates, linked sessions). */
+
 
 export const zh = {
   'task.add': '任务',
@@ -61,7 +61,7 @@ export const zh = {
   'task.ungrouped': '未分组',
 } as const
 
-/** Same keys as `zh`; the `satisfies` keeps the two views in lockstep at compile time. */
+
 export const en = {
   'task.add': 'Task',
   'task.archive': 'Archived',

@@ -1,17 +1,8 @@
-/**
- * Bundled Desk One operating guide.
- *
- * Tool names already say what they do (explicit verbs per object). What a per-tool description
- * cannot carry is the shared knowledge: which object a request belongs to, the list→revision→update
- * sequence, and what archiving/deleting cascades to. This one short runtime skill holds those rules.
- *
- * Registered through the optional skill service: a host without it simply gets no guide (the tools
- * still work), and the registration is disposed with this plugin.
- */
+
 
 import type { Context } from '@deepseek-ai/cordis'
 
-/** The skill body: object model, routing rules, and the revision workflow. */
+
 const CONTENT = `# Desk One（同桌）操作指南
 
 Desk One 是用户的「一张办公桌」，同一份对象存在面板里，工具与界面读写同一批数据。
@@ -54,7 +45,7 @@ Desk One 是用户的「一张办公桌」，同一份对象存在面板里，�
 6. 笔记的批注草稿 / 批注记录由人操作，不要用工具代劳；需要改笔记内容时用文件工具。
 7. 只有完成列的任务才能 archive；未完成任务先 complete 或移动到完成列，不要直接存档。`
 
-/** Runtime skill registration accepted by the optional skill service. */
+
 export const DESK_ONE_SKILL = {
   name: 'desk-one',
   description: 'Operate the user\'s Desk One (同桌): notes wall (便签), task board (任务 / 分组), the read-only schedule mirror, and the read-only page search for the linked notebook (笔记批注). Covers object choice, new-conversation task capture, workspace linking rules, the list→revision→update flow, and archive/delete consequences.',
@@ -64,12 +55,9 @@ export const DESK_ONE_SKILL = {
   content: CONTENT,
 } as const
 
-/**
- * Register the guide through the optional skill service.
- * @param ctx - DSH plugin context.
- */
+
 export function installDeskSkill(ctx: Context): void {
-  // Test doubles and stripped hosts may not implement the optional-dependency fork.
+
   if (typeof ctx.inject !== 'function') return
   ctx.inject(['skills'], (scoped) => {
     const skills = (scoped as unknown as {

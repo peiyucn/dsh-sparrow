@@ -1,4 +1,4 @@
-/** Locale fragment: note-wall actions (create, drag, trash, clear, retry). */
+
 
 export const zh = {
   'action.backToWall': '返回便签墙',
@@ -16,7 +16,7 @@ export const zh = {
   'action.trash': '放入垃圾桶',
 } as const
 
-/** Same keys as `zh`; the `satisfies` keeps the two views in lockstep at compile time. */
+
 export const en = {
   'action.backToWall': 'Back to wall',
   'action.clearTrash': 'Empty trash',

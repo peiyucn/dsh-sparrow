@@ -1,4 +1,4 @@
-/** Calendar boards: list, month and week. The week board owns its 0–24 hour ruler and scroll anchor. */
+
 
 import { addDays, calendarColorOf, calendarNameOf, conflictIds, coversDayKey, dayKey, formatClock24h, formatDateLabel, groupByDay, isMultiDay, isoWeekNumber, monthRange, spanBars, weekBlocks, weekdayLabel, weekdayLabels } from './utils.js'
 import { dayLabel, eventTitle } from './shared.js'
@@ -8,7 +8,7 @@ import type { DeskCalendar, DeskEvent } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
 import type { ReactElement, WheelEvent as ReactWheelEvent } from 'react'
 
-/* ----------------------------------- list ------------------------------------ */
+
 
 interface ListProps {
   readonly t: DeskTranslator
@@ -54,7 +54,7 @@ function isWeekend(date: Date): boolean {
   return date.getDay() === 0 || date.getDay() === 6
 }
 
-/* ----------------------------------- month ----------------------------------- */
+
 
 interface MonthProps {
   readonly t: DeskTranslator
@@ -79,7 +79,7 @@ export function MonthBoard(props: MonthProps): ReactElement {
     for (let index = 0; index < cells.length; index += 7) rows.push(cells.slice(index, index + 7))
     return rows
   }, [from, to])
-  // Multi-day events are drawn as continuous bars (see spanBars); cells only hold single-day ones.
+
   const byDay = useMemo(() => {
     const map = new Map<string, DeskEvent[]>()
     for (const event of events) {
@@ -172,7 +172,7 @@ export function MonthBoard(props: MonthProps): ReactElement {
   )
 }
 
-/* ------------------------------------ week ----------------------------------- */
+
 
 interface WeekProps {
   readonly t: DeskTranslator
@@ -193,22 +193,22 @@ export function WeekBoard(props: WeekProps): ReactElement {
     const key = dayKey(day)
     return events.filter(event => event.allDay && coversDayKey(event, key))
   }), [days, events])
-  // Multi-day all-day events become continuous bars; single-day ones stay in their day cell.
+
   const allDaySpans = useMemo(() => spanBars(allDay.flat(), days), [allDay, days])
   const allDaySingle = useMemo(() => allDay.map(list => list.filter(event => !isMultiDay(event))), [allDay])
   const todayIndex = days.findIndex(day => day.toDateString() === today.toDateString())
   const now = new Date()
   const nowPct = ((now.getHours() * 60 + now.getMinutes()) / 1440) * 100
-  // Show 8 hours per screen (inner height = 300% of the viewport); center the initial scroll on
-  // the current time (or 08:00 when browsing another week).
+
+
   useEffect(() => {
     const element = scrollRef.current
     if (element === null) return
     const fraction = todayIndex >= 0 ? (now.getHours() + now.getMinutes() / 60) / 24 : 8 / 24
     const target = element.scrollHeight * fraction - element.clientHeight / 3
     element.scrollTop = Math.max(0, Math.min(target, element.scrollHeight - element.clientHeight))
-    // Only re-anchor when the week changes, not on every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+
   }, [from])
   return (
     <div className="dsh-desk-schedule-week">
@@ -260,7 +260,7 @@ export function WeekBoard(props: WeekProps): ReactElement {
       </div>
       <div className="dsh-desk-schedule-week-scroll" ref={scrollRef}>
         <div className="dsh-desk-schedule-week-body">
-          {/* Hour ruler: 0–24 down the left edge so every grid line has a time. */}
+          {}
           <div className="dsh-desk-schedule-week-hours" aria-hidden="true">
             {Array.from({ length: 25 }, (_, hour) => (
               <span
@@ -304,4 +304,3 @@ export function WeekBoard(props: WeekProps): ReactElement {
     </div>
   )
 }
-

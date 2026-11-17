@@ -1,14 +1,4 @@
-/**
- * Wall geometry: measures the visible wall and resolves every active note to concrete
- * coordinates, clamped to the wall so the wall never scrolls.
- *
- * Measurement happens in two places on purpose:
- * 1. the callback ref measures as soon as the node attaches (the panel can mount while hidden,
- *    in which case an effect-only measurement would capture 0 and stay there forever);
- * 2. a ResizeObserver keeps the size fresh for window/panel resizes.
- * Drag/resize also read the live node size at gesture start, so a stale state can never clamp a
- * note to the top-left corner.
- */
+
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { NOTE_DEFAULT_HEIGHT, NOTE_DEFAULT_WIDTH, NOTE_MAX_POSITION, NOTE_MAX_SIZE, NOTE_MIN_HEIGHT, NOTE_MIN_WIDTH } from '../../../constants.js'
@@ -16,7 +6,7 @@ import type { DeskNote } from '../../../contract.js'
 import type { PlacedNote, WallSize } from '../../app/types.js'
 import { clamp, fallbackPosition } from '../../app/utils.js'
 
-/** Resolve a note's on-wall box, clamping legacy undersized notes to the current limits. */
+
 export function noteDisplaySize(note: DeskNote): { width: number; height: number } {
   return {
     width: clamp(note.width ?? NOTE_DEFAULT_WIDTH, NOTE_MIN_WIDTH, NOTE_MAX_SIZE),
@@ -24,7 +14,7 @@ export function noteDisplaySize(note: DeskNote): { width: number; height: number
   }
 }
 
-/** Resolve one note to canvas coordinates: X is clamped to the fixed wall width, Y is free. */
+
 export function placeNote(note: DeskNote, index: number, wallSize: WallSize): PlacedNote {
   const { width, height } = noteDisplaySize(note)
   const fallback = fallbackPosition(index)
@@ -36,14 +26,14 @@ export function placeNote(note: DeskNote, index: number, wallSize: WallSize): Pl
 }
 
 export interface WallLayout {
-  /** Mutable ref: the page attaches `setWallRef` (not this object) to the wall node. */
+
   readonly wallRef: { current: HTMLDivElement | null }
   readonly setWallRef: (node: HTMLDivElement | null) => void
   readonly wallSize: WallSize
   readonly placed: readonly PlacedNote[]
 }
 
-/** Read a node's box without trusting any stale state. */
+
 export function measureWall(node: HTMLElement | null): WallSize {
   return node === null ? { width: 0, height: 0 } : { width: node.clientWidth, height: node.clientHeight }
 }
@@ -52,7 +42,7 @@ export function useWallLayout(enabled: boolean, activeNotes: readonly DeskNote[]
   const wallRef = useRef<HTMLDivElement | null>(null)
   const [wallSize, setWallSize] = useState<WallSize>({ width: 0, height: 0 })
 
-  /** Attach + measure in one step: effects alone are too late when the panel mounts hidden. */
+
   const setWallRef = useCallback((node: HTMLDivElement | null): void => {
     wallRef.current = node
     if (node !== null) setWallSize(measureWall(node))
@@ -69,8 +59,8 @@ export function useWallLayout(enabled: boolean, activeNotes: readonly DeskNote[]
     return () => { observer.disconnect() }
   }, [enabled])
 
-  // One resolver for layout and tests: the hook must not keep a second copy of the clamping rules
-  // (the old inline copy had to be edited twice whenever the geometry changed).
+
+
   const placed = useMemo<PlacedNote[]>(
     () => activeNotes.map((note, index) => placeNote(note, index, wallSize)),
     [activeNotes, wallSize.height, wallSize.width],

@@ -1,4 +1,4 @@
-/** Schedule repository: connection records, calendars, and the read-only mirrored events. */
+
 
 import { SCHEDULE_COLORS } from '../../constants.js'
 import { DeskModelError } from '../../model.js'
@@ -9,7 +9,7 @@ import {
 import type { DeskCalendar, DeskEvent, DeskScheduleSource, ScheduleSyncError } from '../../contract.js'
 import type { StoreCore } from './core.js'
 
-/** Input of `createScheduleSource`: one standalone ICS endpoint (no account state). */
+
 export interface CreateScheduleSourceInput {
   readonly provider: 'ics'
   readonly channel: 'ics'
@@ -17,7 +17,7 @@ export interface CreateScheduleSourceInput {
   readonly credentialRef: string
 }
 
-/** Input of `upsertScheduleSource`: one connection line, identified by provider + channel. */
+
 export interface UpsertScheduleSourceInput {
   readonly provider: 'wecom' | 'icloud' | 'outlook' | 'ics'
   readonly channel: 'caldav' | 'ics' | 'graph'
@@ -40,7 +40,7 @@ export class ScheduleRepository {
     return this.core.allNodes().filter((node): node is DeskEvent => node.kind === 'event')
   }
 
-  /** Sources in a stable provider order (wecom -> icloud -> outlook); one per provider+channel. */
+
   listScheduleSources(): DeskScheduleSource[] {
     const order: Record<string, number> = { wecom: 0, icloud: 1, outlook: 2 }
     return [...this.allSources()].sort((left, right) =>
@@ -48,7 +48,7 @@ export class ScheduleRepository {
       || left.id.localeCompare(right.id))
   }
 
-  /** Calendars grouped by source order first, then their manual order inside the source. */
+
   listCalendars(sourceId?: string): DeskCalendar[] {
     const sources = this.listScheduleSources()
     const sourceRank = new Map(sources.map((source, index) => [source.id, index]))
@@ -60,12 +60,12 @@ export class ScheduleRepository {
         || left.id.localeCompare(right.id))
   }
 
-  /** Find the connection record for one provider+channel (v1 keeps a single account per line). */
+
   findScheduleSource(provider: string, channel: string): DeskScheduleSource | undefined {
     return this.allSources().find(source => source.provider === provider && source.channel === channel)
   }
 
-  /** Create one standalone source (used by ICS subscriptions: several sources per provider). */
+
   async createScheduleSource(input: CreateScheduleSourceInput): Promise<DeskScheduleSource> {
     const now = new Date().toISOString()
     const record = createScheduleSourceRecord(input, { now })
@@ -77,7 +77,7 @@ export class ScheduleRepository {
     return this.allSources().find(source => source.id === id)
   }
 
-  /** Create or refresh a connection record; secrets are never stored here (only the ref name). */
+
   async upsertScheduleSource(input: UpsertScheduleSourceInput): Promise<DeskScheduleSource> {
     const now = new Date().toISOString()
     const current = this.findScheduleSource(input.provider, input.channel)
@@ -107,7 +107,7 @@ export class ScheduleRepository {
     return source
   }
 
-  /** Persist sync state / error on a source or calendar record. */
+
   async setScheduleSyncState(
     id: string,
     patch: { readonly syncState?: 'idle' | 'syncing' | 'error'; readonly lastSyncedAt?: string; readonly lastError?: ScheduleSyncError },
@@ -147,7 +147,7 @@ export class ScheduleRepository {
     })
   }
 
-  /** Upsert the remote calendars of one source; existing rows keep the user's colour / visibility. */
+
   async upsertCalendars(source: DeskScheduleSource, drafts: readonly CalendarDraft[]): Promise<DeskCalendar[]> {
     const now = new Date().toISOString()
     const existing = this.allCalendars().filter(calendar => calendar.sourceId === source.id)
@@ -164,7 +164,7 @@ export class ScheduleRepository {
         await this.core.nodes.put(created.id, created)
         continue
       }
-      // Renames come from the remote; colour / order / visibility stay local decisions.
+
       if (current.displayName === draft.displayName) continue
       await this.core.nodes.update(current.id, (node) => node.kind === 'calendar'
         ? { ...node, displayName: draft.displayName, updatedAt: now, revision: node.revision + 1 }
@@ -173,7 +173,7 @@ export class ScheduleRepository {
     return this.listCalendars(source.id)
   }
 
-  /** Local-only metadata patch (colour / visibility / order); remote data is untouched. */
+
   async updateCalendar(
     id: string,
     expectedRevision: number,
@@ -210,11 +210,7 @@ export class ScheduleRepository {
     return updated
   }
 
-  /**
-   * Replace the mirrored events of one calendar with a fresh pull.
-   * The adapter supplies the full mirror window, so events absent from the pull are stale and get
-   * removed (the mirror has no user-owned data; soft delete would only grow tombstones).
-   */
+
   async syncCalendarEvents(calendar: DeskCalendar, drafts: readonly EventDraft[]): Promise<number> {
     const now = new Date().toISOString()
     const existing = this.allEvents().filter(event => event.calendarNodeId === calendar.id)
@@ -259,7 +255,7 @@ export class ScheduleRepository {
     return written
   }
 
-  /** Remove a connection record plus its calendars and mirrored events (local only). */
+
   async removeScheduleSource(sourceId: string): Promise<void> {
     const calendars = this.allCalendars().filter(calendar => calendar.sourceId === sourceId)
     const calendarIds = new Set(calendars.map(calendar => calendar.id))
@@ -270,12 +266,12 @@ export class ScheduleRepository {
     await this.core.nodes.delete(sourceId)
   }
 
-  /** Range query over mirrored events (the only read path for the schedule views). */
+
   listEvents(query: EventQuery): DeskEvent[] {
     return filterEvents(this.allEvents(), query)
   }
 
-  /** Event count per calendar (shown in the calendar-source panel). */
+
   countEventsByCalendar(): Map<string, number> {
     const counts = new Map<string, number>()
     for (const event of this.allEvents()) {

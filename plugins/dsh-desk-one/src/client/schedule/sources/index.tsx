@@ -1,7 +1,4 @@
-/**
- * Calendar settings sub-page: per-provider connection cards, the Outlook Graph card and
- * provider-agnostic ICS subscriptions. Management lives here, not on the calendar page.
- */
+
 
 import { OutlookGraphCard } from './outlook-card.js'
 import { PROVIDER_ORDER } from '../shared.js'
@@ -88,4 +85,3 @@ export function SourcesPage(props: SourcesPageProps): ReactElement {
     </div>
   )
 }
-

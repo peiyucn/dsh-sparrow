@@ -1,4 +1,4 @@
-/** Notes feature CSS: wall, sticky card, bottom actions, trash view and Smash animation. */
+
 
 export const NOTES_CSS = `
 /* Inside the notes tab: wall / trash; the bottom-right corner is left to the floating action group. */

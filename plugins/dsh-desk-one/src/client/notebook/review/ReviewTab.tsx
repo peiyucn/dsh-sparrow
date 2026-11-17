@@ -1,10 +1,4 @@
-/**
- * Review tab: composition only.
- *
- * The tab binds one note's review Session (`useReviewSession`), loads its document/draft/baseline
- * state (`useReviewDocument`), and wires the interaction layer (`useReviewInteraction`); the views,
- * overlays and bottom bar are pure presentational components.
- */
+
 
 import { useEffect, type ReactElement } from 'react'
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -28,14 +22,14 @@ import { showReviewTab } from './tab-visibility.js'
 
 type ReviewProps = PropsRuntime<'sidebar.right.pane.tab'> & InjectFace<NoteReviewInjected> & PropsLocale<typeof LOCALE_NAMESPACE>
 
-/** Notes review tab. */
+
 export function NoteReviewTab(props: ReviewProps): ReactElement {
   const { t, notebook, bridge, sessionId, useTabInfo } = props
   const info = useTabInfo()
   const navigationParams = info.tab.navigation.params as NoteReviewParams | undefined
-  // Publish review-mode visibility for the conversation composer hint: the hint must appear only
-  // while this tab is actually on screen (the official file browser shows a file preview with our
-  // Review view entry instead, where the annotate guidance would be premature).
+
+
+
   useEffect(() => {
     if (!info.tab.visible) return
     return showReviewTab(info.tab.id)
@@ -81,8 +75,8 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   )
 
   const copyPath = (): void => {
-    // The tab shows a transient notice instead of in-place button feedback, so it uses the shared
-    // clipboard primitive directly rather than the `useCopyFeedback` state machine.
+
+
     void writeClipboard(target.path).then(ok => data.setNotice(ok ? t('review.copied') : target.path))
   }
 
@@ -220,7 +214,7 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   )
 }
 
-/** Tab chip title. */
+
 export function NoteReviewTabTitle(props: PropsLocale<typeof LOCALE_NAMESPACE>): ReactElement {
   return (
     <>
@@ -229,4 +223,3 @@ export function NoteReviewTabTitle(props: PropsLocale<typeof LOCALE_NAMESPACE>):
     </>
   )
 }
-

@@ -1,8 +1,4 @@
-/**
- * Review interaction controller: pending selection, the inline composer, the bottom overlays and the
- * floating "annotate" button. Rendering lives in the components; this module owns the DOM listeners
- * and the state transitions around them.
- */
+
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MutableRefObject } from 'react'
@@ -17,7 +13,7 @@ import type {
 } from '../types.js'
 import type { ReviewDocumentController } from './useReviewDocument.js'
 
-/** Everything the review view receives from the interaction layer. */
+
 export interface ReviewInteractionController {
   readonly selection: SelectionTarget | null
   readonly composer: ComposeTarget | null
@@ -48,7 +44,7 @@ export interface ReviewInteractionController {
   readonly submitAll: () => void
 }
 
-/** Bind selection / composer / overlay interactions for one review tab. */
+
 export function useReviewInteraction(input: {
   readonly t: DeskTranslator
   readonly notebook: NotebookApi
@@ -71,7 +67,7 @@ export function useReviewInteraction(input: {
   const composerRef = useRef<HTMLDivElement | null>(null)
   const floatRef = useRef<HTMLButtonElement | null>(null)
 
-  // Bottom overlays dismiss on an outside click or Escape, like the official menus.
+
   useEffect(() => {
     if (overlay === null) return
     const onPointerDown = (event: PointerEvent): void => {
@@ -93,7 +89,7 @@ export function useReviewInteraction(input: {
     }
   }, [overlay])
 
-  /** Drop the pending selection (state, float button and the browser's own highlight). */
+
   const cancelSelection = useCallback((): void => {
     setComposer(null)
     setComment('')
@@ -101,7 +97,7 @@ export function useReviewInteraction(input: {
     window.getSelection()?.removeAllRanges()
   }, [])
 
-  // Escape or a click outside the inline composer cancels the pending annotation.
+
   useEffect(() => {
     if (composer === null) return
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -120,8 +116,8 @@ export function useReviewInteraction(input: {
     }
   }, [cancelSelection, composer])
 
-  // Clicking anywhere but the float "annotate" button drops the pending selection, so the
-  // highlight never gets stuck without a way out.
+
+
   useEffect(() => {
     if (selection === null || composer !== null) return
     const onPointerDown = (event: PointerEvent): void => {
@@ -135,7 +131,7 @@ export function useReviewInteraction(input: {
     return () => document.removeEventListener('pointerdown', onPointerDown, true)
   }, [composer, selection])
 
-  /** Line-based selection: exact source lines, quote as the selected text. */
+
   const handleSelect = useCallback((): void => {
     const container = codeRef.current
     const sel = window.getSelection()
@@ -189,7 +185,7 @@ export function useReviewInteraction(input: {
     window.getSelection()?.removeAllRanges()
   }, [annotations, comment, composer, persist])
 
-  /** Submit the whole batch into the new review session's composer (never sends). */
+
   const submitAll = useCallback((): void => {
     if (target === undefined || annotations.length === 0) return
     const text = annotationMessage(target.path, annotations)

@@ -1,9 +1,6 @@
-/**
- * CodeBuddy 品牌标（黑白版，fill=currentColor 随主题着色）；来源 lobehub/lobe-icons 的 codebuddy.svg（MIT）。
- * 每轮积分胶囊、会话积分胶囊与两者弹层标题共用；尺寸由座位 CSS 决定，这里只给默认值。
- */
 
-/** 默认边长（px）：与官方统计行图标同号。 */
+
+
 export const MARK_DEFAULT_SIZE = 14
 
 export function CodeBuddyMark({ size = MARK_DEFAULT_SIZE }: { size?: number }) {

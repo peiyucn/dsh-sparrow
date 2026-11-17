@@ -1,11 +1,5 @@
-#!/usr/bin/env node
-/**
- * 生成发布说明（tag 注释用）：拼接插件两份 CHANGELOG 的当前版本条目，
- * 英文在上、中文在下。用法：
- *   node scripts/tag-notes.mjs <插件名> <版本号>
- * 输出可直接喂给 git tag：git tag -a <插件名>-vX.Y.Z -F <(node scripts/tag-notes.mjs <插件名> <版本号>)
- * （Windows 先写文件再 -F 文件路径。）
- */
+
+
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
@@ -21,10 +15,10 @@ const read = (file) => readFileSync(join(root, 'plugins', plugin, file), 'utf8')
 
 const section = (text) => {
   const lines = text.split(/\r?\n/)
-  // 版本标题有两种写法，都要认：
-  //   旧：`## 0.2.1-rc.2.1 (2026-10-22)` / `（2026-10-22）`
-  //   新（Keep a Changelog）：`## [0.2.1-rc.3] - 2026-10-24`
-  // 纯字符串匹配（不用正则——版本号来自命令行参数，CodeQL js/regex-injection）。
+
+
+
+
   const bracketPrefix = '## [' + version + ']'
   const plainPrefix = '## ' + version
   const isHeading = (line) => {

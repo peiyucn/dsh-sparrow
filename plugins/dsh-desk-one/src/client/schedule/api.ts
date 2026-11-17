@@ -1,4 +1,4 @@
-/** Browser-side schedule data plane: host REST routes only (read-only mirror + connection CRUD). */
+
 
 import {
   REQUEST_TIMEOUT_MS, ROUTES, SCHEDULE_SYNC_TIMEOUT_MS, SCHEDULE_TEST_TIMEOUT_MS,
@@ -9,15 +9,15 @@ import type {
 } from '../../contract.js'
 import { fetchJson, postJson } from '../http.js'
 
-/** A sync may keep running on the host after the client gives up; say so instead of a bare failure. */
+
 const SCHEDULE_TIMEOUT_MESSAGE = '请求超时：同步可能仍在后台继续，稍后点「同步」或重新打开日程查看'
 
-/** Schedule reads share one timeout text; the limit itself is the ordinary request timeout. */
+
 function fetchSchedule<T>(path: string): Promise<T> {
   return fetchJson<T>(path, undefined, { timeoutMessage: SCHEDULE_TIMEOUT_MESSAGE })
 }
 
-/** Schedule writes share one timeout text; the caller picks the limit per route. */
+
 function postSchedule<T>(path: string, body: unknown, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
   return postJson<T>(path, body, { timeoutMs, timeoutMessage: SCHEDULE_TIMEOUT_MESSAGE })
 }
@@ -87,7 +87,7 @@ export function removeConnection(provider: string): Promise<ScheduleStateRespons
   return postSchedule<ScheduleStateResponse>(ROUTES.scheduleConnectionRemove, { provider })
 }
 
-/** Shared facade injected into the panel seat (keeps components free of fetch details). */
+
 export const scheduleApi: ScheduleApi = {
   loadState, loadEvents, updateCalendar, sync, testConnection, saveConnection, removeConnection,
   addSubscription, removeSubscription, startOutlookLogin, pollOutlookLogin, disconnectOutlook,

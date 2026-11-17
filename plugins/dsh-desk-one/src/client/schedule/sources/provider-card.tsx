@@ -1,7 +1,4 @@
-/**
- * One CalDAV account card (WeCom / iCloud): calendar rows, sync and display switches, and a
- * collapsible connection form. An already-configured source keeps its form collapsed.
- */
+
 
 import { providerKey } from '../shared.js'
 import { ProviderLogo } from './logos.js'
@@ -219,4 +216,3 @@ export function ProviderCard(props: {
     </section>
   )
 }
-

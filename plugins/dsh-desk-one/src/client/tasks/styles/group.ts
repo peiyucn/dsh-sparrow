@@ -1,4 +1,4 @@
-/** Draft card, one-level groups and the compact lane form used by narrow panels. */
+
 
 export const TASK_GROUP_CSS = `
 /* Draft card: an empty title cancels instead of creating an empty task. */

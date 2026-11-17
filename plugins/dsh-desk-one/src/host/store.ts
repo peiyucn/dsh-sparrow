@@ -1,13 +1,4 @@
-/**
- * DeskStore: the host-side entry into the unified object model.
- *
- * All kinds share one `nodes` table; per-kind helpers narrow by `kind` so callers get a typed
- * record and cannot accidentally patch a note through a task API. Writes go through the storage
- * domain's serial write chain, and optimistic concurrency uses the per-object revision.
- *
- * This class is the facade call sites see: the per-domain repositories under `store/` own the
- * implementation, and every public method here is a one-line delegate with the original signature.
- */
+
 
 import type { Context } from '@deepseek-ai/cordis'
 import { DESK_DOMAIN } from './domain.js'
@@ -51,7 +42,7 @@ export class DeskStore {
     this.review = new ReviewRepository(this.core)
   }
 
-  /** Open the storage domain; log a user-facing warning before rethrowing (cordis marks us inactive). */
+
   static async open(ctx: Context): Promise<DeskStore> {
     try {
       const domain = await ctx.storageDomain.open(DESK_DOMAIN)
@@ -66,7 +57,7 @@ export class DeskStore {
     }
   }
 
-  /* ------------------------------- notes ------------------------------- */
+
 
   listNotes(query?: string, limit?: number): DeskNote[] { return this.notes.listNotes(query, limit) }
 
@@ -76,7 +67,7 @@ export class DeskStore {
 
   async deleteNote(id: string): Promise<boolean> { return this.notes.deleteNote(id) }
 
-  /* ------------------------------- tasks ------------------------------- */
+
 
   listTasks(query?: string, limit?: number): DeskTask[] { return this.tasks.listTasks(query, limit) }
 
@@ -86,7 +77,7 @@ export class DeskStore {
 
   async deleteTask(id: string): Promise<boolean> { return this.tasks.deleteTask(id) }
 
-  /* ------------------------------- groups ------------------------------- */
+
 
   listGroups(query?: string, limit?: number): DeskTaskGroup[] { return this.groups.listGroups(query, limit) }
 
@@ -109,7 +100,7 @@ export class DeskStore {
 
   async deleteGroup(id: string): Promise<boolean> { return this.groups.deleteGroup(id) }
 
-  /* ------------------------------ schedule ------------------------------ */
+
 
   listScheduleSources(): DeskScheduleSource[] { return this.schedule.listScheduleSources() }
 
@@ -148,7 +139,7 @@ export class DeskStore {
 
   countEventsByCalendar(): Map<string, number> { return this.schedule.countEventsByCalendar() }
 
-  /* --------------------------- session index --------------------------- */
+
 
   async upsertSessionIndexes(drafts: readonly SessionIndexDraft[]): Promise<{ indexed: number; missing: number }> {
     return this.sessions.upsertSessionIndexes(drafts)
@@ -158,7 +149,7 @@ export class DeskStore {
 
   findSessionIndex(sessionId: string): DeskSessionIndex | undefined { return this.sessions.findSessionIndex(sessionId) }
 
-  /* ------------------------------ notebook ------------------------------ */
+
 
   getNotebookConfig(): DeskNotebookConfig | undefined { return this.notebook.getNotebookConfig() }
 
@@ -184,7 +175,7 @@ export class DeskStore {
 
   async saveNoteBaseline(input: SaveNoteBaselineInput): Promise<NoteBaseline | null> { return this.notebook.saveNoteBaseline(input) }
 
-  /* ------------------------ review markers / records ------------------------ */
+
 
   listReviewSessions(): ReviewSessionMarker[] { return this.review.listReviewSessions() }
 
@@ -196,8 +187,8 @@ export class DeskStore {
 
   async deleteReviewRecord(id: string): Promise<void> { return this.review.deleteReviewRecord(id) }
 
-  /* ------------------------------ lifecycle ------------------------------ */
 
-  /** Close the storage domain (plugin unload / host shutdown, via the effect). */
+
+
   close(): Promise<void> { return this.core.close() }
 }

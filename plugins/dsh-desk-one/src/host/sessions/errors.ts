@@ -1,4 +1,4 @@
-/** Sessions host errors: same semantics as the archived plugin's ArchiveError. */
+
 
 type SessionsErrorCode =
   | 'BAD_BODY'

@@ -1,36 +1,22 @@
-/**
- * 轮次导航（Turn Navigation）在窄列不消失 + 会话内容宽度钳制 —— 自 `dsh-nav-pin` 并入的**功能**。
- * 纯 CSS，无运行期探测：官方把 `display: none` 直接写在导航 `<nav>` 上，这里用官方公开的滚动区
- * `[data-conversation-scroll]` 定位它（会话面包屑 nav 在标题行、不在滚动区内，不会误伤）。
- * 断点与宽度公式照官方常量取。
- */
 
-/**
- * 官方轮次导航 `nav` 的锚点：滚动区内的 `nav`。
- * 官方没有给这个 nav 专门的 data 属性，但滚动区属性是公开的，且当前滚动区内只有这一个 nav；
- * 若官方日后在滚动区新增 nav，这条选择器需要重新收窄（见 docs/private-seams.md §C）。
- */
+
+
 export const NAV_SELECTOR = '[data-conversation-scroll] nav'
 
-/** 官方在 900px 隐藏；并到 700px 才停显。 */
+
 export const HOVER_HIDE_BREAKPOINT_PX = 700
 
-/** 浮现过渡（与旧版一致）。 */
+
 const OPACITY_TRANSITION_MS = 120
 const NATIVE_HEIGHT_TRANSITION = 'height 220ms cubic-bezier(0.2, 0.8, 0.2, 1)'
 
-/** 内容宽度钳制：宽列每侧至少留 120px，窄列地板 640px（官方最小内容宽）。 */
+
 export const CONTENT_MAX_SIDE_CLEARANCE_PX = 120
 export const CONTENT_MIN_FLOOR_PX = 640
-/** 输入卡片比内容宽 32px（官方 `--dsh-composer-card-max-width` 公式）。 */
+
 const CARD_EXTRA_WIDTH_PX = 32
 
-/**
- * 内容宽度轴：官方 `.body` 的语义是 `--dsh-chat-content-width: var(--dsh-chat-user-width, clamp(680px, column×0.64, 920px))`，
- * 官方拖拽条只写 `--dsh-chat-user-width`（拖动中实时写、松手后写 localStorage 偏好）。所以这里必须
- * **保留官方 var 的优先级**：有用户偏好（或正在拖）时原样交给官方，没有偏好时才用本插件的
- * 「每侧至少留 120px / 地板 640px」钳制版自适应宽度。直接写死派生值会把拖拽结果盖掉（官方 0.2.1 的宽度拖拽因此失效）。
- */
+
 function clampedContentWidth(): string {
   const derived = 'clamp(680px, calc(var(--dsh-conversation-column-width, 0px) * 0.64), 920px)'
   const adaptive = `min(${derived}, max(${CONTENT_MIN_FLOOR_PX}px, calc(var(--dsh-conversation-column-width, 0px) - ${CONTENT_MAX_SIDE_CLEARANCE_PX * 2}px)))`

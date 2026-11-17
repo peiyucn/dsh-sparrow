@@ -1,8 +1,4 @@
-/**
- * Shared header for in-panel sub-pages (notes trash, task archive, calendar sources).
- * The back button lives in the shared top-bar actions slot; this header owns the title, the
- * optional count and an optional right-aligned action so every sub-page lines up identically.
- */
+
 import type { ReactElement, ReactNode } from 'react'
 
 export function SubPageHeader(props: {
@@ -19,7 +15,7 @@ export function SubPageHeader(props: {
   )
 }
 
-/** Shared "load more" footer for paged sub-page lists. */
+
 export function LoadMore(props: {
   readonly more: boolean
   readonly label: string

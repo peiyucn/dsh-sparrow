@@ -1,14 +1,9 @@
-/** Shared browser-side JSON transport: every feature talks to this plugin's own REST routes. */
+
 
 import { REQUEST_TIMEOUT_MS } from '../constants.js'
 import type { ApiErrorPayload } from '../contract.js'
 
-/**
- * Transport failure carrying the HTTP status, so callers can special-case opt-in outcomes (409)
- * and timeouts (0). `code` is the host's semantic error code when the response carried one, so a
- * caller can tell two failures with the same status apart (e.g. an expired login flow vs a
- * revision conflict, both 409).
- */
+
 export class HttpError extends Error {
   constructor(readonly status: number, message: string, readonly code?: string) {
     super(message)
@@ -16,36 +11,30 @@ export class HttpError extends Error {
   }
 }
 
-/** Per-call transport tuning; ordinary CRUD calls keep the shared defaults. */
+
 export interface JsonRequestOptions {
-  /** Abort after this many milliseconds. Ignored when the caller passes its own `init.signal`. */
+
   readonly timeoutMs?: number
-  /** User-visible timeout text; long-running routes explain what may still be running. */
+
   readonly timeoutMessage?: string
 }
 
-/** Default timeout text: an ordinary request is safe to retry, so it names no background work. */
+
 const DEFAULT_TIMEOUT_MESSAGE = '请求超时：服务器响应过慢，请稍后重试'
 
-/** `AbortSignal.timeout` rejects with a `DOMException`; only a signal this module created may become a timeout. */
+
 function isTimeoutRejection(error: unknown): boolean {
   return error instanceof DOMException && (error.name === 'TimeoutError' || error.name === 'AbortError')
 }
 
-/**
- * Fetch one JSON document with a timeout.
- * @param path - route path (this plugin's own prefix).
- * @param init - fetch options; the caller's signal wins over the default timeout.
- * @param options - timeout tuning (see `JsonRequestOptions`).
- * @returns the parsed payload.
- */
+
 export async function fetchJson<T>(path: string, init?: RequestInit, options?: JsonRequestOptions): Promise<T> {
   const timeoutMs = options?.timeoutMs ?? REQUEST_TIMEOUT_MS
   let response: Response
   try {
     response = await fetch(path, { ...init, signal: init?.signal ?? AbortSignal.timeout(timeoutMs) })
   } catch (error) {
-    // A caller-supplied signal is never rewritten: its abort stays a plain rejection.
+
     if (init?.signal === undefined && isTimeoutRejection(error)) {
       throw new HttpError(0, options?.timeoutMessage ?? DEFAULT_TIMEOUT_MESSAGE)
     }
@@ -68,7 +57,7 @@ export async function fetchJson<T>(path: string, init?: RequestInit, options?: J
   return payload
 }
 
-/** POST a JSON body to one route. */
+
 export function postJson<T>(path: string, body: unknown, options?: JsonRequestOptions): Promise<T> {
   return fetchJson<T>(path, {
     method: 'POST',
@@ -77,7 +66,7 @@ export function postJson<T>(path: string, body: unknown, options?: JsonRequestOp
   }, options)
 }
 
-/** DELETE one route. */
+
 export function deleteJson<T>(path: string, body?: unknown, options?: JsonRequestOptions): Promise<T> {
   return fetchJson<T>(path, {
     method: 'DELETE',

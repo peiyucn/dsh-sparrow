@@ -1,4 +1,4 @@
-/** Task REST routes: handlers only; mounting / trust fence live in host/router.ts. */
+
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { MAX_QUERY_CHARS, ROUTES, TASK_STATUSES } from '../../constants.js'

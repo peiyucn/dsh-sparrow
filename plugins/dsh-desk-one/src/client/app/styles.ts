@@ -1,4 +1,4 @@
-/** Page shell CSS: panel page, header, tabs, notebook placeholder, error and retry button. */
+
 
 export const APP_CSS = `
 

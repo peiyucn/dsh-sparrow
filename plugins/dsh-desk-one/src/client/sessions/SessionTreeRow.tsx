@@ -1,10 +1,4 @@
-/**
- * Shared session-tree row. Active catalog, archived tree, stray and trash rows all use this one
- * component so indentation, typography, metadata and action placement cannot drift apart.
- *
- * The expand caret is a sibling of the title button (not a child): a disabled/live row must still
- * be collapsible, otherwise trash parents look permanently expanded/collapsed by accident.
- */
+
 
 import type { ReactElement, ReactNode } from 'react'
 
@@ -13,7 +7,7 @@ interface SessionTreeRowProps {
   readonly title: string
   readonly depth: number
   readonly subagent?: boolean
-  /** Optional lineage badge text (e.g. "subagent"). */
+
   readonly tag?: ReactNode
   readonly live?: boolean
   readonly disabled?: boolean

@@ -1,10 +1,4 @@
-/**
- * Pure record helpers for the schedule mirror (host half).
- *
- * No Node/browser APIs: the store and route tests drive these directly. External data (CalDAV /
- * ICS) is normalised by the adapters; this module only turns remote drafts into stored records
- * and answers range queries.
- */
+
 
 import { randomUUID } from 'node:crypto'
 import { SCHEDULE_COLORS } from '../../constants.js'
@@ -13,7 +7,7 @@ import type {
 } from '../../contract.js'
 import type { ScheduleChannel, ScheduleProvider } from '../../constants.js'
 
-/** What an adapter produces for one event instance (times already normalised to UTC ISO). */
+
 export interface EventDraft {
   readonly externalId: string
   readonly uid: string
@@ -37,7 +31,7 @@ export interface CalendarDraft {
   readonly displayName: string
 }
 
-/** Deterministic colour assignment: stable for a given order, wrapped around the palette. */
+
 export function colorForOrder(order: number): string {
   return SCHEDULE_COLORS[((order % SCHEDULE_COLORS.length) + SCHEDULE_COLORS.length) % SCHEDULE_COLORS.length] ?? SCHEDULE_COLORS[0]
 }
@@ -132,10 +126,7 @@ export function createEventRecord(
   }
 }
 
-/**
- * Adapter events carry provider-owned fields; the store only needs the draft shape. Every field is
- * copied explicitly, so adding one to {@link RemoteEvent} requires adding it here too.
- */
+
 export function draftFromRemote(event: {
   readonly externalId: string; readonly uid: string; readonly recurrenceId?: string
   readonly title: string; readonly description?: string; readonly location?: string
@@ -162,7 +153,7 @@ export function draftFromRemote(event: {
   }
 }
 
-/** True when a stored event already carries everything the fresh draft has (skip the write). */
+
 export function eventMatchesDraft(event: DeskEvent, draft: EventDraft): boolean {
   return event.externalId === draft.externalId
     && event.uid === draft.uid
@@ -181,7 +172,7 @@ export function eventMatchesDraft(event: DeskEvent, draft: EventDraft): boolean 
     && event.rrule === draft.rrule
 }
 
-/** List equality for optional read-only facts (undefined and empty are both "absent"). */
+
 function sameList(left: readonly string[] | undefined, right: readonly string[] | undefined): boolean {
   const a = left ?? []
   const b = right ?? []
@@ -189,7 +180,7 @@ function sameList(left: readonly string[] | undefined, right: readonly string[] 
   return a.every((value, index) => value === b[index])
 }
 
-/** ISO instants compare lexicographically only when the timezone suffix is identical (Z). */
+
 function eventOverlaps(event: Pick<DeskEvent, 'start' | 'end'>, from: string, to: string): boolean {
   return event.start < to && event.end > from
 }
@@ -208,7 +199,7 @@ export interface EventQuery {
   readonly provider?: ScheduleProvider
 }
 
-/** Range query over the mirrored events: half-open [from, to) overlap, optional calendar/provider filter. */
+
 export function filterEvents(events: readonly DeskEvent[], query: EventQuery): DeskEvent[] {
   const calendarIds = query.calendarIds === undefined ? undefined : new Set(query.calendarIds)
   return sortEvents(events.filter(event =>
@@ -217,7 +208,7 @@ export function filterEvents(events: readonly DeskEvent[], query: EventQuery): D
     && (query.provider === undefined || event.provider === query.provider)))
 }
 
-/** Normalised failure record for the source / calendar rows (never contains a secret). */
+
 export function scheduleErrorOf(error: unknown): ScheduleSyncError {
   if (error instanceof Error) {
     const code = typeof (error as { code?: unknown }).code === 'string'

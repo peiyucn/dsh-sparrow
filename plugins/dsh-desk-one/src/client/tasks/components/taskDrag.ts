@@ -1,9 +1,6 @@
-/**
- * Pointer-drag helpers shared by card and whole-group gestures: ghost construction, fixed
- * placement, and the per-gesture text-selection lock.
- */
 
-/** Copy live input values into a cloned node (cloneNode keeps attributes, not DOM properties). */
+
+
 function copyFieldValues(source: HTMLElement, clone: HTMLElement): void {
   const sources = source.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input,textarea')
   const copies = clone.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input,textarea')
@@ -13,7 +10,7 @@ function copyFieldValues(source: HTMLElement, clone: HTMLElement): void {
   })
 }
 
-/** Build a pointer-following ghost from the real card (values copied; original stays dimmed). */
+
 export function createCardGhost(card: HTMLElement): HTMLElement {
   const ghost = card.cloneNode(true) as HTMLElement
   ghost.classList.add('dsh-task-ghost')
@@ -22,7 +19,7 @@ export function createCardGhost(card: HTMLElement): HTMLElement {
   return ghost
 }
 
-/** Whole-group ghost: the header + its cards move together, exactly like a card. */
+
 export function createGroupGhost(group: HTMLElement): HTMLElement {
   const ghost = group.cloneNode(true) as HTMLElement
   ghost.classList.add('dsh-task-group-ghost')
@@ -32,7 +29,7 @@ export function createGroupGhost(group: HTMLElement): HTMLElement {
   return ghost
 }
 
-/** Pin a ghost to the viewport at the drag's starting rectangle. */
+
 export function placeGhost(ghost: HTMLElement, left: number, top: number, width: number): void {
   ghost.style.position = 'fixed'
   ghost.style.left = `${left}px`
@@ -42,10 +39,7 @@ export function placeGhost(ghost: HTMLElement, left: number, top: number, width:
   ghost.style.zIndex = '9999'
 }
 
-/**
- * Suppress native text selection while a pointer drag is possible. Because clicks must still
- * work (field editing / double-click rename), this is applied per gesture and always restored.
- */
+
 export function lockSelection(): () => void {
   const previous = document.body.style.userSelect
   document.body.style.userSelect = 'none'

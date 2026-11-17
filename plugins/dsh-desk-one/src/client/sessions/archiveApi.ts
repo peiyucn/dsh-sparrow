@@ -1,4 +1,4 @@
-/** Browser-side session archive data plane: host session routes only. */
+
 
 import { PREFIX } from '../../constants.js'
 import type {
@@ -8,18 +8,18 @@ import type {
 } from '../../session-admin.js'
 import { fetchJson, postJson } from '../http.js'
 
-/** Session routes sit under the plugin's own prefix; the archive surface is one mount point of them. */
+
 const BASE = `${PREFIX}/sessions`
-/** Archive reads scan disk and align the tree; mutations may move whole session trees. */
+
 const ARCHIVE_READ_TIMEOUT_MS = 60_000
 const ARCHIVE_MUTATION_TIMEOUT_MS = 120_000
 
-/** Archive reads are slow but side-effect free; the limit is relaxed separately from ordinary requests. */
+
 function readArchive<T>(path: string): Promise<T> {
   return fetchJson<T>(`${BASE}${path}`, undefined, { timeoutMs: ARCHIVE_READ_TIMEOUT_MS })
 }
 
-/** Archive mutations may move whole session trees, so they get the longest archive budget. */
+
 function postArchive<T>(path: string, body: unknown): Promise<T> {
   return postJson<T>(`${BASE}${path}`, body, { timeoutMs: ARCHIVE_MUTATION_TIMEOUT_MS })
 }

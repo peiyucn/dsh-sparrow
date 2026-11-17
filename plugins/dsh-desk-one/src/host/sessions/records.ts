@@ -1,4 +1,4 @@
-/** Session index records: a foreign key + searchable cache, never a copy of session content. */
+
 
 import type { DeskSessionIndex } from '../../contract.js'
 
@@ -13,7 +13,7 @@ export interface SessionIndexDraft {
   readonly updatedAt: number
 }
 
-/** Deterministic id: rebuilding the index must not change the FK target. */
+
 export function sessionIndexId(sessionId: string): string {
   return `session_${sessionId}`
 }

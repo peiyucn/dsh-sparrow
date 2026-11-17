@@ -1,4 +1,4 @@
-/** CodeBuddy Credits 设置卡表单（同构官方 ProviderEditor）；DOM seam 见 ./settings-row.ts；Key 只发本机 host 路由。 */
+
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { formatModelFacts } from './format.js'
@@ -14,7 +14,7 @@ const KEY_URL = `${API_PREFIX}/key`
 const REMOVE_URL = `${API_PREFIX}/remove-key`
 const REFRESH_URL = `${API_PREFIX}/refresh-models`
 const AUTO_ADAPT_URL = `${API_PREFIX}/auto-adapt`
-/** 保存/清空 Key 后广播的窗口事件（对话页额度卡据此联动刷新）。 */
+
 const STATUS_CHANGED_EVENT = 'codebuddy-credits-status-changed'
 
 interface CardStatus {
@@ -26,11 +26,11 @@ interface CardStatus {
 
 interface CardProps {
   t: (key: string, vars?: Record<string, string>) => string
-  /** 官方页面 owner 共享：行头凭据 join 结果（初始渲染即可用，无需等状态接口）。 */
+
   keyConfigured?: boolean
 }
 
-/** 官方 apiKeyFailure 的轻量镜像：可打印 ASCII（空格除外）。 */
+
 const LEGAL_API_KEY = /^[\x21-\x7E]+$/
 
 function keyFailure(draft: string): boolean {
@@ -40,7 +40,7 @@ function keyFailure(draft: string): boolean {
   return !LEGAL_API_KEY.test(value)
 }
 
-/** 账号类型文案（官方 type 为 enterprise/ultimate/personal；未知值原样展示）。 */
+
 function accountTypeLabel(t: CardProps['t'], raw: string | undefined): string | undefined {
   if (raw === undefined) return undefined
   if (raw === 'enterprise' || raw === 'ultimate') return t('account.enterprise')
@@ -60,7 +60,7 @@ export function CodeBuddyProviderCard({ t, keyConfigured: ownerKeyConfigured }: 
   const [autoAdapt, setAutoAdapt] = useState(true)
   const [message, setMessage] = useState<string | undefined>(undefined)
   const [messageKind, setMessageKind] = useState<'error' | 'info'>('info')
-  // 官方 savedProvider 同款：应用成功即关闭编辑器并显示绿色保存提示，直到下次编辑/取消。
+
   const [savedNotice, setSavedNotice] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
 
@@ -71,17 +71,17 @@ export function CodeBuddyProviderCard({ t, keyConfigured: ownerKeyConfigured }: 
       const payload = await response.json() as CardStatus
       setStatus(payload)
       if (payload.autoAdapt !== undefined) setAutoAdapt(payload.autoAdapt)
-      // 设置卡读到的模型事实同样回写共享表（与额度卡/选择器同源）。
+
       syncModelFacts(payload.models ?? [])
     } catch {
-      // 状态读取失败保持原状（离线/服务未就绪时卡片静默降级）。
+
     }
   }, [])
   useEffect(() => {
     void load()
   }, [load])
 
-  /** 手动重新扫描可用模型：只走本插件 host 路由（只重拉本 provider 目录，不触碰其他 provider）。 */
+
   const refreshModels = useCallback(async () => {
     if (refreshing) return
     setRefreshing(true)
@@ -96,7 +96,7 @@ export function CodeBuddyProviderCard({ t, keyConfigured: ownerKeyConfigured }: 
         return
       }
       const list = Array.isArray(payload?.models) ? payload.models : []
-      // 手动刷新结果同步进共享事实表：选择器/额度卡不必等下一次 /status。
+
       syncModelFacts(list)
       setStatus(previous => previous === undefined ? previous : { ...previous, models: list })
       setRefreshNote(payload?.changed === true
@@ -109,7 +109,7 @@ export function CodeBuddyProviderCard({ t, keyConfigured: ownerKeyConfigured }: 
     }
   }, [refreshing, t])
 
-  /** 「自适应 API 拦截」开关：乐观更新，失败回滚并给可见错误。 */
+
   const toggleAutoAdapt = useCallback(async (enabled: boolean) => {
     if (adaptBusy) return
     setAdaptBusy(true)
@@ -131,36 +131,36 @@ export function CodeBuddyProviderCard({ t, keyConfigured: ownerKeyConfigured }: 
     }
   }, [adaptBusy, t])
 
-  // 捕获阶段拦住官方行头「编辑」按钮（stopPropagation 阻断官方编辑器）；官方改结构时由 settings-row.ts 静默降级。
+
   useEffect(() => {
     const onClickCapture = (event: MouseEvent): void => {
       if (!isRowEditTrigger(rootRef.current, event.target)) return
       event.preventDefault()
       event.stopPropagation()
-      // 双向开关：编辑态点击即收起（官方编辑按钮的 toggle 语义）。
+
       setEditing(value => !value)
     }
     document.addEventListener('click', onClickCapture, true)
     return () => document.removeEventListener('click', onClickCapture, true)
   }, [])
 
-  // 编辑器打开即清掉绿色保存提示（官方语义：提示持续到下一次编辑）。
+
   useEffect(() => {
     if (editing) setSavedNotice(false)
   }, [editing])
 
-  // 绿色保存提示插到 section 顶部（官方 savedProvider 位置）；无公开槽位只能 DOM 插入（见 settings-row.ts）。
+
   useEffect(() => {
     if (!savedNotice) return
     return insertSavedNotice(rootRef.current, t('saved.provider'))
   }, [savedNotice, t])
 
-  // 首装 setup 姿态没有行头「编辑」按钮：折叠会让卡片完全空掉，自动展开一次。
+
   useEffect(() => {
     if (shouldAutoExpandSetup(rootRef.current)) setEditing(true)
   }, [])
 
-  // 任一信号（页面 join / 状态接口）确认已配置即折叠；状态未知时不渲染任何内容，避免先闪出输入区。
+
   const configured = status?.keyConfigured === true || ownerKeyConfigured === true
   const pending = status === undefined && ownerKeyConfigured !== true
   const showEditor = editing
@@ -168,7 +168,7 @@ export function CodeBuddyProviderCard({ t, keyConfigured: ownerKeyConfigured }: 
 
   const save = async () => {
     const key = draft.trim()
-    // 未输入新 Key 时传空串：服务端用已存 Key 重拉模型目录与账号信息（reapply）。
+
     if (key.length === 0 && !configured) {
       setMessageKind('error')
       setMessage(t('error.empty'))
@@ -184,18 +184,18 @@ export function CodeBuddyProviderCard({ t, keyConfigured: ownerKeyConfigured }: 
       }, CLIENT_ACTION_TIMEOUT_MS)
       const payload = await response.json().catch(() => ({})) as { error?: string }
       if (!response.ok) {
-        // 原样透传服务端错误（如企业策略 ip not in whitelist）。
+
         setMessageKind('error')
         setMessage(payload.error ?? t('error.saveFailed'))
         return
       }
       setDraft('')
-      // 官方语义：应用成功即收起编辑器。
+
       setMessage(undefined)
       setSavedNotice(true)
       setEditing(false)
       await load()
-      // 通知对话页额度卡联动刷新（出现/消失），无需刷新页面。
+
       window.dispatchEvent(new Event(STATUS_CHANGED_EVENT))
     } catch {
       setMessageKind('error')
@@ -209,11 +209,11 @@ export function CodeBuddyProviderCard({ t, keyConfigured: ownerKeyConfigured }: 
     setDraft('')
     setMessage(undefined)
     setSavedNotice(false)
-    // 官方语义：取消即收起编辑器（无论是否已配置）。
+
     setEditing(false)
   }
 
-  /** 清空已保存的 Key（凭据与模型目录一起清掉；profile 保留，行头圆点转红）。 */
+
   const clearKey = async () => {
     setBusy(true)
     setMessage(undefined)
@@ -229,7 +229,7 @@ export function CodeBuddyProviderCard({ t, keyConfigured: ownerKeyConfigured }: 
       setSavedNotice(false)
       setMessage(undefined)
       await load()
-      // 通知对话页额度卡联动刷新（清空后积分胶囊消失），无需刷新页面。
+
       window.dispatchEvent(new Event(STATUS_CHANGED_EVENT))
     } catch {
       setMessageKind('error')
@@ -246,8 +246,8 @@ export function CodeBuddyProviderCard({ t, keyConfigured: ownerKeyConfigured }: 
     account?.enterpriseName,
   ].filter((part): part is string => part !== undefined)
 
-  // 状态未知与折叠态都渲染 0×0 隐藏锚点（不是 null）：拦截监听与 :has 锚点须从首帧起就位，
-  // 否则窗口期点官方「编辑」会打开官方编辑器、出现双标题；行下不显示任何内容。
+
+
   if (pending || !showEditor) {
     return <div ref={rootRef} className={`${CCB_CLASS.cardRoot} ${CCB_CLASS.cardRootHidden}`} />
   }
@@ -317,7 +317,7 @@ export function CodeBuddyProviderCard({ t, keyConfigured: ownerKeyConfigured }: 
               : models.length === 0
                 ? <p className={CCB_CLASS.cardHint}>{t('models.empty')}</p>
                 : models.map(model => (
-                // 名称用服务端原始名（不带系数/free）；右侧为只读事实（系数 · 上下文长度）。
+
                 <div key={model.id} className={CCB_CLASS.cardModelRow}>
                   <span className={CCB_CLASS.cardModelName} title={model.id}>{model.name}</span>
                   <span className={CCB_CLASS.cardModelFact}>{formatModelFacts(model)}</span>

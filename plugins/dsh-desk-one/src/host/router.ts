@@ -1,9 +1,4 @@
-/**
- * Prefix router: trust fence first, then table lookup, then the feature handlers.
- *
- * Feature modules only contribute route entries; mounting, fencing and error mapping live here,
- * so adding tasks/calendar never requires editing the security-sensitive part.
- */
+
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
@@ -20,15 +15,15 @@ import type { NotebookHost } from './notebook/host.js'
 import { NOTEBOOK_ROUTES } from './notebook/routes.js'
 import type { SessionsHost } from './sessions/install.js'
 
-/** Collaborators available to one feature request. */
+
 export interface DeskRouteContext {
   readonly ctx: Context
   readonly store: DeskStore
-  /** Schedule orchestration (optional so read-only tests can mount the router without it). */
+
   readonly schedule?: ScheduleHost
-  /** Notebook library index + draft box. */
+
   readonly notebook?: NotebookHost
-  /** Session archive capabilities; routes are appended when installed. */
+
   readonly sessions?: SessionsHost
 }
 
@@ -40,14 +35,12 @@ export interface DeskRouteEntry {
   readonly handle: RouteHandler
 }
 
-/** All built-in HTTP routes; session routes are appended at handler creation when installed. */
+
 const BASE_ROUTE_TABLE: readonly DeskRouteEntry[] = [
   ...NOTE_ROUTES, ...TASK_ROUTES, ...GROUP_ROUTES, ...SCHEDULE_ROUTES, ...NOTEBOOK_ROUTES,
 ]
 
-/** OAuth redirects are top-level browser navigations from Microsoft, so they carry no plugin
- * trusted-origin headers. Only the loopback callback path is exempt; it still validates the
- * one-time OAuth state before exchanging the code. */
+
 function isLoopbackOauthCallback(req: IncomingMessage, pathname: string): boolean {
   if (req.method !== 'GET' || pathname !== ROUTES.scheduleOutlookCallback) return false
   const host = (req.headers.host ?? '').toLowerCase()
@@ -55,7 +48,7 @@ function isLoopbackOauthCallback(req: IncomingMessage, pathname: string): boolea
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
 }
 
-/** Build the prefix handler: fence -> exact match -> feature handler, with unified error mapping. */
+
 export function createDeskRequestHandler(route: DeskRouteContext): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
   const routes: readonly DeskRouteEntry[] = route.sessions === undefined
     ? BASE_ROUTE_TABLE
@@ -63,8 +56,8 @@ export function createDeskRequestHandler(route: DeskRouteContext): (req: Incomin
   return async (req, res) => {
     const pathname = new URL(req.url ?? '/', 'http://localhost').pathname
     try {
-      // The fence runs before any route (read-only included): our prefix is longer than the
-      // official `/api` fence, so the host-level check would not fire for requests under it.
+
+
       if (!isLoopbackOauthCallback(req, pathname)
         && !isTrustedPluginRequest(req.headers, officialTrustedHosts(route.ctx))) {
         sendError(route.ctx, res, new DeskError('FORBIDDEN', '拒绝非本机同源的请求', 403))

@@ -1,4 +1,4 @@
-/** 配置面：默认值与归一化。纯逻辑、无 Node / 浏览器依赖，host 与 client 都能 import。 */
+
 
 import { DEFAULT_MAX_BODY_BYTES, DEFAULT_REQUEST_TIMEOUT_MS } from './constants.js'
 
@@ -8,7 +8,7 @@ export const DEFAULT_API_KEY_ENV = 'DEEPSEEK_API_KEY'
 export const DEFAULT_MAX_PROMPT_CHARS = 32_768
 export const DEFAULT_MAX_TOKENS = 96
 export const DEFAULT_SUGGESTION_COUNT = 1
-/** 默认采样温度 0.3：temp=1 漂移明显、会复读历史消息。 */
+
 export const DEFAULT_TEMPERATURE = 0.3
 
 export interface ChatFimConfig {
@@ -23,7 +23,7 @@ export interface ChatFimConfig {
   readonly temperature: number
 }
 
-/** 把外部配置补成完整内部配置；非法数字一律拒绝（插件加载期即失败，而不是请求期）。 */
+
 export function normalizeConfig(input: Readonly<Partial<ChatFimConfig>> | undefined): ChatFimConfig {
   const config: ChatFimConfig = {
     baseURL: input?.baseURL?.trim() || DEFAULT_BASE_URL,

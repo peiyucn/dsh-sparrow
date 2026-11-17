@@ -1,7 +1,4 @@
-/**
- * Notes wall rendering: the fixed-width, vertically infinite scrollport with its canvas of sticky
- * notes. Pure presentation — behavior (add / raise / commit / drag commits) is passed in.
- */
+
 
 import type { ReactElement, RefObject } from 'react'
 import { NOTE_DEFAULT_HEIGHT, NOTE_DEFAULT_WIDTH } from '../../constants.js'
@@ -11,7 +8,7 @@ import type { DeskTranslator } from '../app/types.js'
 import { NoteCard } from './components/NoteCard.js'
 import type { NoteDrag } from './hooks/useNoteDrag.js'
 
-/** Render the notes wall. */
+
 export function NotesWall(props: {
   readonly t: DeskTranslator
   readonly setWallRef: (node: HTMLDivElement | null) => void
@@ -28,7 +25,7 @@ export function NotesWall(props: {
   readonly onColor: (note: DeskNote, color: NoteColor) => void
   readonly onTrash: (note: DeskNote) => void
   readonly onBodyCommit: (note: DeskNote, element: HTMLTextAreaElement) => void
-  /** "和 DSH 一起": prefill a note prompt in the conversation (never sends). */
+
   readonly onAskDesk: () => void
 }): ReactElement {
   const {
@@ -40,8 +37,8 @@ export function NotesWall(props: {
       className="dsh-desk-wall"
       ref={setWallRef}
       onDoubleClick={(event) => {
-        // Listen on the scrollport: empty space below the canvas box is still part of the wall.
-        // Notes and controls own their double-clicks; coordinates are canvas-relative.
+
+
         const target = event.target as HTMLElement
         if (target.closest('.dsh-desk-note, button, textarea, input, .dsh-desk-wall-tip')) return
         const canvas = canvasRef.current

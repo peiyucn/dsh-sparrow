@@ -1,4 +1,4 @@
-/** Locale fragment: sessions tab (active, archived and trash management). */
+
 
 export const zh = {
   'sessions.active': '活跃会话',
@@ -44,7 +44,7 @@ export const zh = {
   'sessions.subagent': '子会话',
 } as const
 
-/** Same keys as `zh`; the `satisfies` keeps the two views in lockstep at compile time. */
+
 export const en = {
   'sessions.active': 'Active sessions',
   'sessions.activeEmpty': 'No active sessions',

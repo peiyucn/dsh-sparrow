@@ -1,7 +1,4 @@
-/**
- * Field-level normalizers shared by tasks and groups: small pure functions that turn raw request
- * bodies into typed fields (or throw a model error). Notes keep their own text rules in model.ts.
- */
+
 
 import { MAX_GROUP_CHARS, MAX_TASK_SESSIONS, TASK_STATUSES } from '../constants.js'
 import type { TaskStatus } from '../contract.js'
@@ -11,7 +8,7 @@ export function isTaskStatus(value: unknown): value is TaskStatus {
   return typeof value === 'string' && (TASK_STATUSES as readonly string[]).includes(value)
 }
 
-/** Accept only real calendar days in `YYYY-MM-DD` (2026-02-31 must not silently roll over). */
+
 function isValidDueDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false
   const parsed = new Date(`${value}T00:00:00.000Z`)
@@ -26,13 +23,13 @@ export function normalizeDue(raw: { readonly date?: unknown; readonly timezone?:
   return { date: raw.date, ...(timezone === '' ? {} : { timezone }) }
 }
 
-/** Non-negative integer order; invalid values are ignored (display order falls back to creation). */
+
 export function normalizeOrder(value: unknown): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return undefined
   return Math.round(value)
 }
 
-/** One-level group name: trimmed, blank means "no name", overlength is rejected. */
+
 export function normalizeGroupName(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
   const name = value.trim()
@@ -43,14 +40,14 @@ export function normalizeGroupName(value: unknown): string | undefined {
   return name
 }
 
-/** Membership id: non-empty trimmed string (the group record itself is validated by the store). */
+
 export function normalizeGroupId(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
   const id = value.trim()
   return id === '' ? undefined : id
 }
 
-/** Linked session ids: opaque strings, deduplicated in order, bounded so a card stays readable. */
+
 export function normalizeSessionIds(value: unknown): readonly string[] {
   if (value === undefined || value === null) return []
   if (!Array.isArray(value)) throw new DeskModelError('INVALID_TASK', 'sessionIds 必须是字符串数组')

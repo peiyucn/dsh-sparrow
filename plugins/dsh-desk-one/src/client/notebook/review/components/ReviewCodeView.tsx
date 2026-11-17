@@ -1,7 +1,4 @@
-/**
- * Source code view: exact line numbers, this round's changed-line tint, selected range, inline
- * annotation cards and the inline composer. Rendering only — selection state lives in the controller.
- */
+
 
 import { Fragment } from 'react'
 import type { ReactElement, RefObject } from 'react'
@@ -11,7 +8,7 @@ import type { LineRange } from '../format.js'
 import type { ComposeTarget } from '../types.js'
 import { AnnotationCard } from './AnnotationCard.js'
 
-/** Render the source view for one page. */
+
 export function ReviewCodeView(props: {
   readonly t: DeskTranslator
   readonly codeRef: RefObject<HTMLDivElement>
@@ -20,7 +17,7 @@ export function ReviewCodeView(props: {
   readonly annotationsByLine: ReadonlyMap<number, readonly DraftAnnotation[]>
   readonly selectedRange: LineRange | undefined
   readonly composer: ComposeTarget | null
-  /** Composer card to render under the target line (already built by the parent). */
+
   readonly composerCard: ReactElement | null
   readonly onMouseUp: () => void
   readonly onEditAnnotation: (annotation: DraftAnnotation) => void

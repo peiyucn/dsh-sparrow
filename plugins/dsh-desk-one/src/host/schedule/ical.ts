@@ -1,25 +1,11 @@
-/**
- * iCalendar → {@link RemoteEvent} mapping for the read-only mirror.
- *
- * ical.js is used instead of hand-rolled line parsing because WeCom emits non-IANA TZIDs whose UTC
- * offsets only exist in the embedded VTIMEZONE; registering those zones is what makes wall-clock
- * DTSTART values convertible to UTC. The zone registry is process-global, so registered zones are
- * removed in a `finally` (this function is synchronous, so two calendars cannot interleave).
- *
- * Recurring events are expanded into instances inside the pull window. `.rrule` keeps the master
- * rule text so the store can re-expand after the window moves; the instance identity is
- * `UID#RECURRENCE-ID` (non-recurring events use the bare `UID`).
- */
+
 
 import ICAL from 'ical.js'
 import { SCHEDULE_MAX_EVENTS } from '../../constants.js'
 import { ScheduleError } from './types.js'
 import type { PullWindow, RemoteEvent } from './types.js'
 
-/**
- * Guard for pathological rules (e.g. FREQ=MINUTELY spanning years): stop expanding instead of
- * pinning the host CPU. Personal calendars stay far below this in a nine-month window.
- */
+
 const MAX_RECURRENCE_ITERATIONS = 100_000
 
 type IcalComponent = InstanceType<typeof ICAL.Component>
@@ -71,7 +57,7 @@ export function parseIcsEvents(ics: string, opts: ParseIcsOptions): RemoteEvent[
   }
 }
 
-/** Register every embedded VTIMEZONE so TZID lookups (including non-IANA ids) resolve. */
+
 function registerTimezones(root: IcalComponent, registered: string[]): void {
   for (const zone of root.getAllSubcomponents('vtimezone')) {
     const tzid = zone.getFirstPropertyValue('tzid')
@@ -95,7 +81,7 @@ function groupEvents(root: IcalComponent): Map<string, EventGroup> {
     if (component.hasProperty('recurrence-id')) {
       group.overrides.push(component)
     } else if (group.master === null) {
-      // The RFC forbids two masters with one UID; keep the first instead of failing the calendar.
+
       group.master = component
     }
   }
@@ -104,27 +90,23 @@ function groupEvents(root: IcalComponent): Map<string, EventGroup> {
 
 function eventsOfGroup(group: EventGroup, opts: ParseIcsOptions, range: WindowRange): RemoteEvent[] {
   if (group.master === null) {
-    // A lone override is malformed, but showing the moved instance beats dropping the calendar.
+
     return group.overrides.flatMap(component => standaloneOverrideEvents(component, group.uid, opts, range))
   }
   const master = createEvent(group.master, group.overrides)
   if (statusOf(master) === 'CANCELLED') return []
   const rrule = rruleText(group.master)
   if (!master.isRecurring()) {
-    // ical.js auto-relates sibling RECURRENCE-ID components regardless of UID, so never construct
-    // an event without explicit exceptions (here: none, because a non-recurring master has none).
-    // Overrides attached to a non-recurring master are malformed; dropping them beats duplicating.
+
+
+
     const single = singleEvent(master, group.uid, opts, range, rrule)
     return single === null ? [] : [single]
   }
   return recurringEvents(master, group.overrides, group.uid, opts, range, rrule)
 }
 
-/**
- * Never pass the component alone: ical.js then auto-relates EVERY sibling VEVENT carrying a
- * RECURRENCE-ID (regardless of UID), which cross-wires unrelated series. Explicit exceptions keep
- * each UID group isolated.
- */
+
 function createEvent(component: IcalComponent, exceptions: IcalComponent[] = []): IcalEvent {
   return new ICAL.Event(component, { exceptions })
 }
@@ -163,7 +145,7 @@ function recurringEvents(
     iterations += 1
     if (iterations > MAX_RECURRENCE_ITERATIONS) break
     const occurrenceMs = timeToMs(occurrence)
-    // RecurExpansion yields occurrences in ascending order; later starts cannot re-enter the window.
+
     if (occurrenceMs >= range.endMs) break
     const recurrenceId = occurrenceKey(occurrence)
     emitted.add(recurrenceId)
@@ -188,8 +170,8 @@ function recurringEvents(
     }, opts))
   }
 
-  // Overrides the iterator never produced still belong in the mirror: EXDATE / COUNT exhaustion,
-  // or an instance moved in from outside the window. Emit just those that intersect the window.
+
+
   for (const overrideComponent of overrides) {
     const override = createEvent(overrideComponent)
     if (statusOf(override) === 'CANCELLED') continue
@@ -251,13 +233,10 @@ interface BuildEventInput {
   rrule?: string
 }
 
-/** Calendar addresses cap: a 500-person invite would otherwise bloat every mirrored row. */
+
 const MAX_ATTENDEES = 50
 
-/**
- * One CAL-ADDRESS property as a display label: the CN parameter wins (WeCom and iCloud both send
- * the person's name there), otherwise the address without its `mailto:` prefix.
- */
+
 function addressLabel(property: IcalProperty): string {
   const rawCn = property.getParameter('cn')
   const cn = typeof rawCn === 'string' ? rawCn.trim() : ''
@@ -266,10 +245,7 @@ function addressLabel(property: IcalProperty): string {
   return cn !== '' ? cn : address
 }
 
-/**
- * Attendees in feed order, deduplicated by address (the same person may appear once with a CN and
- * once without) and bounded; empty when the source exports none.
- */
+
 function attendeeLabels(component: IcalComponent): string[] {
   const labels: string[] = []
   const seen = new Set<string>()
@@ -303,8 +279,8 @@ function buildRemoteEvent(input: BuildEventInput, opts: ParseIcsOptions): Remote
     startUtc: new Date(timeToMs(input.start)).toISOString(),
     endUtc: new Date(timeToMs(input.end)).toISOString(),
     allDay,
-    // An all-day DATE carries no TZID; anchoring it at midnight UTC keeps the UTC date equal to the
-    // event date on every host (the client must render all-day events from the UTC date, not shift).
+
+
     timezone: allDay ? 'UTC' : zoneName(input.start),
     busy: input.busy,
   }
@@ -325,9 +301,9 @@ function buildRemoteEvent(input: BuildEventInput, opts: ParseIcsOptions): Remote
 function timeToMs(time: IcalTime): number {
   if (time.isDate) return Date.UTC(time.year, time.month - 1, time.day)
   if (time.zone === ICAL.Timezone.localTimezone) {
-    // A floating time (or a TZID whose VTIMEZONE is missing) has no real UTC anchor. Treat the
-    // wall clock as UTC instead of asking the process timezone: the result is deterministic and
-    // `timezone` says UTC instead of silently claiming a local zone the server never sent.
+
+
+
     return Date.UTC(time.year, time.month - 1, time.day, time.hour, time.minute, time.second)
   }
   return time.convertToZone(ICAL.Timezone.utcTimezone).toJSDate().getTime()
@@ -339,7 +315,7 @@ function zoneName(time: IcalTime): string {
   return typeof tzid === 'string' && tzid !== '' ? tzid : 'UTC'
 }
 
-/** Canonical instance identity: UTC-normalised RECURRENCE-ID (`20261110T010000Z`, dates `20261110`). */
+
 function occurrenceKey(time: IcalTime): string {
   return time.convertToZone(ICAL.Timezone.utcTimezone).toICALString()
 }
@@ -358,7 +334,7 @@ function eventUrl(event: IcalEvent): string | undefined {
   const value = event.component.getFirstPropertyValue('url')
   if (typeof value !== 'string') return undefined
   const url = value.trim()
-  // Only http(s): the client renders this as a "jump to source" link, so javascript:/data: must die here.
+
   return /^https?:\/\//i.test(url) ? url : undefined
 }
 
@@ -371,10 +347,7 @@ function textValue(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-/**
- * DESCRIPTION arrives with client-specific formatting noise: WeCom writes literal `\r` escapes at
- * line ends and pads separators with 100 dots. Keep the readable text, drop the decoration.
- */
+
 export function cleanDescription(raw: string): string {
   return raw
     .replace(/\\r\\n/gu, '\n')
@@ -383,7 +356,7 @@ export function cleanDescription(raw: string): string {
     .replace(/\r\n?/gu, '\n')
     .split('\n')
     .map((line) => line.replace(/[ \t]+$/u, ''))
-    // Rules made only of dots / dashes are a separator drawn by the source client.
+
     .filter((line) => !/^\s*[.·。_\-—]{3,}\s*$/u.test(line))
     .join('\n')
     .replace(/\n{3,}/gu, '\n\n')
@@ -391,7 +364,7 @@ export function cleanDescription(raw: string): string {
 }
 
 function intersectsWindow(startMs: number, endMs: number, range: WindowRange): boolean {
-  // Half-open overlap; zero-length events count when their start is inside the window.
+
   if (endMs <= startMs) return startMs >= range.startMs && startMs < range.endMs
   return startMs < range.endMs && endMs > range.startMs
 }
@@ -405,7 +378,7 @@ function toWindowRange(window: PullWindow): WindowRange {
   return { startMs, endMs }
 }
 
-/** Sort by start then identity so repeated pulls keep a stable order; duplicate ids keep the first. */
+
 function sortAndDedupe(events: RemoteEvent[]): RemoteEvent[] {
   const unique = new Map<string, RemoteEvent>()
   for (const event of events) {

@@ -1,10 +1,4 @@
-/**
- * One board lane.
- *
- * The lane body is ONE manual block sequence: each ungrouped card and each group is a block, so a
- * group can be dragged to any position among the cards. Group internals live in TaskGroupBlock,
- * the lane header in LaneHeader, and the inline draft in TaskDraftCard.
- */
+
 
 import { useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
@@ -21,13 +15,13 @@ import { TaskGroupBlock } from './TaskGroupBlock.js'
 export interface DropTarget {
   readonly status: TaskStatus
   readonly groupId?: string
-  /** Card index when `groupId` is set, otherwise a lane block insertion index. */
+
   readonly index: number
-  /** True for a unified block insertion (ungrouped area); false for a group's card list. */
+
   readonly block?: boolean
 }
 
-/** Group drag target: which lane, and the block insertion position. */
+
 export interface GroupDropTarget {
   readonly status: TaskStatus
   readonly index: number
@@ -101,7 +95,7 @@ export function TaskColumn({
     />
   )
 
-  /** Double-click on empty lane / group body adds a card in that place. */
+
   const handleDoubleClick = (event: React.MouseEvent<HTMLElement>): void => {
     const target = event.target as HTMLElement
     if (target.closest('[data-task-id],input,textarea,button,[data-block-index]')) return

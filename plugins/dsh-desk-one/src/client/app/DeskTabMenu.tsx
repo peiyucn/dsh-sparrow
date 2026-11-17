@@ -1,8 +1,4 @@
-/**
- * Trailing "…" tab: official conversation header keeps an overflow launcher at the end of the
- * tab strip. Today it opens the full tab list; later tabs can be moved out of the visible strip
- * without growing it indefinitely.
- */
+
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -18,7 +14,7 @@ interface DeskTabMenuProps {
   readonly tab: Tab
   readonly onSelectTab: (tab: Tab) => void
   readonly entries: readonly DeskTabEntry[]
-  /** "许个愿": prefill the feature-issue request in the conversation (never sends). */
+
   readonly onWish: () => void
 }
 
@@ -59,7 +55,7 @@ export function DeskTabMenu({ t, tab, onSelectTab, entries, onWish }: DeskTabMen
     itemRefs.current[Math.max(0, index)]?.focus()
   }, [entries, open, tab])
 
-  /** Every menu has at least the "许个愿" row, so one more than the overflow entries. */
+
   const rowCount = entries.length + 1
 
   const focusItem = (index: number): void => {
@@ -140,8 +136,7 @@ export function DeskTabMenu({ t, tab, onSelectTab, entries, onWish }: DeskTabMen
                   </button>
                 )
               })}
-              {/* "许个愿": the overflow menu's permanent last row — prefill a feature-issue
-                  request for this project's GitHub repository. */}
+              {}
               <button
                 ref={(node) => { itemRefs.current[entries.length] = node }}
                 type="button"
@@ -153,7 +148,7 @@ export function DeskTabMenu({ t, tab, onSelectTab, entries, onWish }: DeskTabMen
                   anchorRef.current?.focus()
                 }}
               >
-                {/* Same 16px check column as the tab rows; the Desk One mark takes the accent colour. */}
+                {}
                 <span className="dsh-desk-tabmenu-check" aria-hidden="true">
                   <DeskGlyph size={14} />
                 </span>

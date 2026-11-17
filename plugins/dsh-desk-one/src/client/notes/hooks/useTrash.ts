@@ -1,12 +1,4 @@
-/**
- * Trash view + wall clean-up behavior.
- *
- * Deletions are soft (notes move to the trash), but both are capped: the wall by
- * MAX_ACTIVE_NOTES and the trash by MAX_TRASH_NOTES, so the collection stays small enough
- * to render and sync without pagination. Both one-note trashing and "Smash!" play the same
- * fly-away animation before the optimistic removal, which prevents a flash-back while the
- * server round-trip settles.
- */
+
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
@@ -14,9 +6,9 @@ import { MAX_TRASH_NOTES, TRASH_PAGE_SIZE } from '../../../constants.js'
 import type { DeskNote } from '../../../contract.js'
 import type { DeskTranslator } from '../../app/types.js'
 
-/** Whole-wall animation window: enough for the 260ms keyframes plus the stagger. */
+
 const SMASH_ANIMATION_MS = 480
-/** Single-note animation window (same keyframes, no stagger). */
+
 const NOTE_TRASH_ANIMATION_MS = 300
 
 interface TrashDeps {
@@ -64,8 +56,8 @@ export function useTrash({
     trashTimers.current.clear()
   }, [])
 
-  // An armed destructive action is a modal-ish intent: clicking anywhere else or pressing Esc
-  // cancels it. Covers both Smash and "clear trash" so the button never stays red.
+
+
   useEffect(() => {
     if (!confirmSmash && !confirmClearTrash) return
     const onPointerDown = (event: PointerEvent): void => {
@@ -114,7 +106,7 @@ export function useTrash({
     for (const note of trashedNotes) removeWithFeedback(note.id)
   }, [confirmClearTrash, removeWithFeedback, trashedNotes])
 
-  /** Soft-delete one note after its fly-away animation; refuses when the trash is full. */
+
   const trashNote = useCallback((note: DeskNote): void => {
     if (trashingIds.has(note.id)) return
     if (trashedNotes.length >= MAX_TRASH_NOTES) {
@@ -135,17 +127,17 @@ export function useTrash({
         next.delete(note.id)
         return next
       })
-      // Optimistic removal first, persistence second: no flash-back while the write settles.
+
       setNotes(current => current.map(item => item.id === note.id ? { ...item, trashed: true } : item))
       savePatch(note, { trashed: true })
     }, NOTE_TRASH_ANIMATION_MS)
     trashTimers.current.set(note.id, timer)
   }, [savePatch, setActionError, setNotes, t, trashedNotes.length, trashingIds])
 
-  /** Smash: two-step confirmation then move the whole wall into the trash. */
+
   const smashWall = useCallback((): void => {
     if (smashing) return
-    // The button is permanent; with an empty wall it simply does nothing.
+
     if (activeNotes.length === 0) return
     if (!confirmSmash) {
       setConfirmSmash(true)

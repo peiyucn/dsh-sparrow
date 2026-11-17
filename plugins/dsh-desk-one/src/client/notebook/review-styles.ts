@@ -1,4 +1,4 @@
-/** Review tab styles (official theme aliases only). */
+
 
 export const REVIEW_CSS = `
 .dsh-desk-review {

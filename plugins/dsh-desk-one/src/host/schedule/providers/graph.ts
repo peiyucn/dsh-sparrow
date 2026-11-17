@@ -1,8 +1,4 @@
-/**
- * Outlook personal calendars over Microsoft Graph (OAuth device code, no published ICS link).
- * The refresh token is the only stored secret; access tokens stay in memory and are refreshed on
- * demand. Events are requested with `Prefer: outlook.timezone="UTC"` so Graph returns UTC stamps.
- */
+
 
 import {
   OUTLOOK_GRAPH_CLIENT_ID, OUTLOOK_GRAPH_SCOPE, OUTLOOK_GRAPH_TENANT, SCHEDULE_REQUEST_TIMEOUT_MS,
@@ -48,7 +44,7 @@ interface GraphEvent {
   readonly attendees?: readonly { readonly emailAddress?: { readonly name?: string; readonly address?: string } }[]
 }
 
-/** Display name wins over the address, matching how the ICS path labels people. */
+
 function personLabel(person: { readonly name?: string; readonly address?: string } | undefined): string {
   const name = typeof person?.name === 'string' ? person.name.trim() : ''
   if (name !== '') return name
@@ -125,7 +121,7 @@ function formBody(values: Record<string, string>): URLSearchParams {
   return body
 }
 
-/** PKCE S256: code challenge for the browser redirect flow. */
+
 export async function codeChallenge(verifier: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))
   return Buffer.from(digest).toString('base64url')
@@ -261,7 +257,7 @@ export async function listGraphCalendars(accessToken: string, deps: GraphDeps = 
     .map(item => ({ id: item.id, name: item.name ?? item.id }))
 }
 
-/** Graph UTC stamp (`2026-11-09T10:00:00.0000000`) -> ISO UTC. */
+
 function isoOf(graph: { dateTime?: string; timeZone?: string } | undefined): string | undefined {
   if (graph?.dateTime === undefined || graph.dateTime === '') return undefined
   const normalized = graph.dateTime.replace(/\.\d+$/u, '')

@@ -1,9 +1,4 @@
-/**
- * Outlook OAuth for the schedule source: two login shapes (browser redirect with PKCE, device-code
- * fallback), the in-memory flow registry those logins use, and the short-lived Graph access-token
- * cache. Only the refresh token is persisted (through the credentials seam); everything else is
- * process memory and dies with the host.
- */
+
 
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
@@ -31,14 +26,14 @@ type OutlookFlow =
       completed?: ScheduleStateResponse
     }
 
-/** Finished / abandoned login flows are only useful for one poll; keep the map small and finite. */
+
 const MAX_OUTLOOK_FLOWS = 32
 
-/** Facade seams the OAuth module cannot import directly without a cycle. */
+
 export interface OutlookOAuthDeps {
-  /** Pull one source directly (login warm-up; deliberately bypasses the shared single-flight slot). */
+
   readonly syncSource: (source: DeskScheduleSource) => Promise<ScheduleSyncSourceReport>
-  /** Current schedule page state, returned after a successful login / disconnect. */
+
   readonly state: () => ScheduleStateResponse
 }
 
@@ -48,7 +43,7 @@ export class OutlookOAuth {
 
   constructor(private readonly ctx: Context, private readonly store: DeskStore, private readonly deps: OutlookOAuthDeps) {}
 
-  /** Browser redirect login (default) or device code (fallback). */
+
   async startOutlookLogin(redirectUri?: string): Promise<OutlookLoginStartResponse> {
     this.pruneFlows()
     if (redirectUri !== undefined && redirectUri !== '') {
@@ -95,10 +90,7 @@ export class OutlookOAuth {
     }
   }
 
-  /**
-   * Drop expired flows and cap the registry. A login left open in a browser tab must not keep the
-   * map growing for the lifetime of the host process.
-   */
+
   private pruneFlows(): void {
     const now = Date.now()
     for (const [id, flow] of this.outlookFlows) {
@@ -131,7 +123,7 @@ export class OutlookOAuth {
     try {
       tokens = await pollGraphDeviceCode(flow.deviceCode, adapterDeps())
     } catch (error) {
-      // A pending device code is a normal poll result, not a page-level error.
+
       if (error instanceof ScheduleError && error.kind === 'TRANSIENT') {
         return { status: 'pending', message: error.message }
       }
@@ -142,7 +134,7 @@ export class OutlookOAuth {
     return this.finishOutlookLogin(tokens.refreshToken)
   }
 
-  /** OAuth redirect callback: exchange the code, persist the refresh token, warm one sync. */
+
   async completeOutlookLogin(code: unknown, state: unknown): Promise<{ ok: boolean; message: string }> {
     this.pruneFlows()
     const value = text(code)
@@ -172,19 +164,19 @@ export class OutlookOAuth {
       credentialRef: OUTLOOK_GRAPH_REFRESH_REF,
     })
     await this.deps.syncSource(source).catch((error: unknown) => {
-      // The connection is valid; a warm-up failure is retried by the next sync and must be visible
-      // in the log instead of disappearing.
+
+
       this.ctx.logger.warn(`dsh-desk-one: Outlook 登录后预热同步失败：${error instanceof Error ? error.message : String(error)}`)
     })
     return { status: 'connected', state: this.deps.state() }
   }
 
-  /** Drop every cached Graph access token (the disconnect path). */
+
   clearGraphAccess(): void {
     this.graphAccess.clear()
   }
 
-  /** Valid Graph access token for one source, refreshing (and persisting) when expired. */
+
   async graphToken(source: DeskScheduleSource): Promise<string> {
     const cached = this.graphAccess.get(source.id)
     if (cached !== undefined && cached.expiresAt > Date.now() + 60_000) return cached.token
@@ -194,8 +186,8 @@ export class OutlookOAuth {
     if (tokens.refreshToken !== undefined) {
       const service = requireCredentials(this.ctx)
       await service.set(OUTLOOK_GRAPH_REFRESH_REF, tokens.refreshToken).catch((error: unknown) => {
-        // A rotated refresh token that fails to persist leaves the user connected until the next
-        // refresh; log it instead of silently swallowing the failure.
+
+
         this.ctx.logger.warn(`dsh-desk-one: Outlook refresh token 持久化失败：${error instanceof Error ? error.message : String(error)}`)
       })
     }

@@ -1,4 +1,4 @@
-/** Two-click confirmation button shared by archive and active session rows. */
+
 import type { ReactElement } from 'react'
 
 export function ConfirmButton(props: {

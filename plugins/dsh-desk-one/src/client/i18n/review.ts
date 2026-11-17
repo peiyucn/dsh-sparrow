@@ -1,4 +1,4 @@
-/** Locale fragment: note review pane (annotations, drafts, records, baseline). */
+
 
 export const zh = {
   'review.annotate': '批注',
@@ -52,7 +52,7 @@ export const zh = {
   'review.wrap': '换行',
 } as const
 
-/** Same keys as `zh`; the `satisfies` keeps the two views in lockstep at compile time. */
+
 export const en = {
   'review.annotate': 'Annotate',
   'review.baselineHint': 'Baseline: {time}',

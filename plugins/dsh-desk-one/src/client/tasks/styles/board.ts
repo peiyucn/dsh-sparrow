@@ -1,4 +1,4 @@
-/** Board shell, lane columns/headers and drop indicators. */
+
 
 export const TASK_BOARD_CSS = `
 /* Board shell: fills the tab content area; narrow panels switch lanes to their compact form. */

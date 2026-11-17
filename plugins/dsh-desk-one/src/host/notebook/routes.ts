@@ -1,4 +1,4 @@
-/** Notebook REST routes: library state, workspace link, search/list, file opens, drafts, baselines, history and review markers. */
+
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { isAbsolute } from 'node:path'
@@ -11,7 +11,7 @@ import { DeskError, bodyObject, readJsonBody, sendJson } from '../http.js'
 import type { DeskRouteContext, DeskRouteEntry } from '../router.js'
 import { workspaceRootOf } from './workspace-root.js'
 
-/** Notebook host or an unavailable error. */
+
 function notebookOf(route: DeskRouteContext) {
   const notebook = route.notebook
   if (notebook === undefined) throw new DeskError('NOTEBOOK_UNAVAILABLE', '笔记库不可用', 503)
@@ -64,7 +64,7 @@ async function fileRoute(route: DeskRouteContext, req: IncomingMessage, res: Ser
   sendJson(res, 200, await notebookOf(route).ensureFile(path))
 }
 
-/** Workspace-scoped open: the client names the workspace it is browsing, not a global library. */
+
 async function openRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const body = bodyObject<{ workspaceId?: string; path?: string }>(await readJsonBody(req), '请求体必须是对象')
   const workspaceId = typeof body.workspaceId === 'string' ? body.workspaceId.trim() : ''
@@ -74,7 +74,7 @@ async function openRoute(route: DeskRouteContext, req: IncomingMessage, res: Ser
   sendJson(res, 200, await notebookOf(route).openAt(workspaceRootOf(route.ctx.workspaceRegistry, workspaceId), path))
 }
 
-/** Read one file back by its persisted identity (used when restoring a review tab). */
+
 async function openByIdRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? '/', 'http://localhost')
   const fileId = url.searchParams.get('fileId') ?? ''
@@ -117,8 +117,8 @@ async function baselineGetRoute(route: DeskRouteContext, req: IncomingMessage, r
 }
 
 async function baselineSaveRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  // A review baseline carries the whole note body (up to the reviewable file cap), so it must not
-  // be rejected by the default 64 KiB transport cap.
+
+
   const body = bodyObject<NoteBaselineRequest>(await readJsonBody(req, NOTEBOOK_WRITE_BODY_BYTES), '请求体必须是对象')
   if (typeof body.sessionId !== 'string' || body.sessionId === '') throw new DeskError('BAD_BODY', '缺少 sessionId')
   if (typeof body.fileId !== 'string' || body.fileId === '') throw new DeskError('BAD_BODY', '缺少 fileId')
@@ -146,7 +146,7 @@ async function draftGetRoute(route: DeskRouteContext, req: IncomingMessage, res:
 }
 
 async function draftSaveRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  // A draft box may carry up to NOTEBOOK_MAX_DRAFTS annotations, well above the default cap.
+
   const body = bodyObject<NoteDraftRequest>(await readJsonBody(req, NOTEBOOK_WRITE_BODY_BYTES), '请求体必须是对象')
   if (typeof body.fileId !== 'string' || body.fileId === '') throw new DeskError('BAD_BODY', '缺少 fileId')
   if (!Array.isArray(body.drafts)) throw new DeskError('BAD_BODY', 'drafts 必须是数组')
@@ -161,7 +161,7 @@ async function draftSaveRoute(route: DeskRouteContext, req: IncomingMessage, res
       ? { expectedRevision: body.expectedRevision }
       : {},
   })
-  // Empty batch = deleted draft box; the response shape stays `{ draft: null }`.
+
   sendJson(res, 200, { draft })
 }
 

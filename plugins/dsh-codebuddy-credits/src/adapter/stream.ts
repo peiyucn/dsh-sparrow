@@ -1,22 +1,15 @@
-/**
- * CodeBuddy 流状态机：SSE 帧 → DSH StreamChunk（块索引映射、终块组装、usage / finish）。
- *
- * 别改的方言行为：SSE delta 的 content 与 reasoning_content 分离；usage 帧含 credit
- * （DSH 无此字段，随 replayState 持久化给积分重放）；终帧必须按官方顺序
- * 收尾已开块（携带累计全量）→ usage → finish；finish 之后不再向流里补块。
- */
+
 
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, FinishReason, GenerateOptions, StreamChunk, TokenUsage } from '@deepseek-ai/dsh-llm'
 import { parseSseLine } from './sse.js'
 
-/** 思考档位 → 线格式。wire 拼写按档位名直发（待公司网络实测确认）。 */
+
 function wireReasoningEffort(effort: GenerateOptions['reasoningEffort']): string | undefined {
   return effort === undefined ? undefined : String(effort)
 }
 
-/** Max 模式（推理档位锁）的最终生效档位（纯函数，供单测）：锁开且模型有推理能力即强制
- *  "max"，服务端宽容接受未声明的 max，别改成先校验档位白名单。 */
+
 export function effectiveReasoningEffort(
   maxMode: boolean,
   modelReasoning: boolean,
@@ -26,7 +19,7 @@ export function effectiveReasoningEffort(
   return wireReasoningEffort(effort)
 }
 
-/** 服务端 finish_reason → DSH 契约。 */
+
 export function mapFinish(reason: string): FinishReason | undefined {
   switch (reason) {
     case 'stop': return { kind: 'stop' }
@@ -37,7 +30,7 @@ export function mapFinish(reason: string): FinishReason | undefined {
   }
 }
 
-/** CodeBuddy usage 帧 → DSH TokenUsage（credit 单独提取）。 */
+
 export function mapUsage(raw: Record<string, unknown>): { tokens: TokenUsage; credit?: number } {
   const prompt = typeof raw.prompt_tokens === 'number' ? raw.prompt_tokens : 0
   const completion = typeof raw.completion_tokens === 'number' ? raw.completion_tokens : 0
@@ -60,15 +53,7 @@ export function mapUsage(raw: Record<string, unknown>): { tokens: TokenUsage; cr
   }
 }
 
-/**
- * 从 SSE 帧里取上游错误文案：OpenAI 方言 `{"error":{"message":...}}`、
- * CodeBuddy 方言 `{"code":<非0>,"msg":...}`（无 choices）。普通帧返回 undefined。
- *
- * 上游偶尔先回 200 再在流里夹错误帧；不识别的话流会走到「结束前中断」，
- * 上游的真实文案被吞掉（2026-11-11 报障：带图请求只看到通用 400 / 中断）。
- * @param frame - 已解析的 SSE 数据帧。
- * @returns 错误文案；不是错误帧时为 undefined。
- */
+
 export function errorFrameMessage(frame: Record<string, unknown>): string | undefined {
   const error = frame.error
   if (typeof error === 'string' && error.length > 0) return error
@@ -76,7 +61,7 @@ export function errorFrameMessage(frame: Record<string, unknown>): string | unde
     const message = (error as Record<string, unknown>).message
     return typeof message === 'string' && message.length > 0 ? message : '未知错误'
   }
-  // CodeBuddy 方言错误帧：没有 choices 的 {code, msg}；code 0 / 正常帧不在此列。
+
   if (!Array.isArray(frame.choices)
     && typeof frame.code === 'number' && frame.code !== 0
     && typeof frame.msg === 'string' && frame.msg.length > 0) {
@@ -85,8 +70,7 @@ export function errorFrameMessage(frame: Record<string, unknown>): string | unde
   return undefined
 }
 
-/** 已开块的最终 ContentBlock 组装（block-end 携带）——必须带累计的完整内容：空内容终块
- *  会让流式过程可见、结果消失，工具调用变成「unknown tool ""」。 */function blockFor(
+function blockFor(
   index: number,
   textByIndex: ReadonlyMap<number, string>,
   toolIdByIndex: ReadonlyMap<number, string>,
@@ -103,7 +87,7 @@ export function errorFrameMessage(frame: Record<string, unknown>): string | unde
   }
 }
 
-/** 消费上游 SSE 响应体，按帧产出 DSH 流块；`onActivity` 在每次读到数据后调用（刷新空闲计时）。 */
+
 export async function* streamFrames(
   body: ReadableStream<Uint8Array>,
   model: string,
@@ -112,16 +96,16 @@ export async function* streamFrames(
   const reader = body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
-  // 块索引：reasoning=0、text=1、tool 调用从 2 起
+
   const TOOL_BASE = 2
-  /** wire 工具 index（0 起）→ 块索引（≥TOOL_BASE）。 */
+
   const toolIndexByWire = new Map<number, number>()
-  /** 无 wire index 的方言：工具 id → 块索引。 */
+
   const toolIndexById = new Map<string, number>()
   let nextToolIndex = TOOL_BASE
   const opened = new Set<number>()
   const finished = new Set<number>()
-  // block-end 必须带累计全量（DSH 以终块组装最终消息）。
+
   const textByIndex = new Map<number, string>()
   const toolIdByIndex = new Map<number, string>()
   const toolNameByIndex = new Map<number, string>()
@@ -168,8 +152,8 @@ export async function* streamFrames(
           }
           const calls = Array.isArray(delta.tool_calls) ? delta.tool_calls as Array<Record<string, unknown>> : []
           for (const call of calls) {
-            // wire 工具 index 是 0 起（同消息内编号），块索引空间是 0=reasoning、
-            // 1=text、工具 ≥TOOL_BASE——必须映射，不能直用。
+
+
             const wireIndex = typeof call.index === 'number' ? call.index : undefined
             let index: number | undefined
             if (wireIndex !== undefined) {
@@ -180,7 +164,7 @@ export async function* streamFrames(
                 toolIndexByWire.set(wireIndex, index)
               }
             } else {
-              // 无 index 的方言：按 id 兜底映射。
+
               let callId = typeof call.id === 'string' ? call.id : ''
               if (callId === '') callId = 'call-unknown'
               index = toolIndexById.get(callId)
@@ -211,7 +195,7 @@ export async function* streamFrames(
         }
         const reason = choice !== undefined && typeof choice.finish_reason === 'string' ? choice.finish_reason : ''
         if (reason.length > 0 && !finishSent) {
-          // 终帧：按官方顺序先收尾所有已开块（携带累计全量内容）→ usage → finish。
+
           for (const index of [...opened].filter(i => !finished.has(i))) {
             finished.add(index)
             chunks.push({
@@ -238,8 +222,8 @@ export async function* streamFrames(
           })
           finishSent = true
         } else if (frame.usage !== null && typeof frame.usage === 'object' && frame.usage !== undefined) {
-          // 尾随 usage 帧（终帧之后到达）：块已收尾，不再向流里补发 usage 块——
-          // finish 之后再推块违反消费端契约。
+
+
           const { tokens } = mapUsage(frame.usage as Record<string, unknown>)
           if (!usageSent && !finishSent) {
             chunks.push({ type: 'usage', usage: tokens })

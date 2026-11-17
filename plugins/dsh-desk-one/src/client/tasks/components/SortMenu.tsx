@@ -1,10 +1,4 @@
-/**
- * Sort dropdown for the task board — one compact trigger, options in a menu.
- *
- * Semantics and visuals follow the official Menu primitive (hairline elevated card, menuitemradio
- * rows, check on the current option); placement reuses the body-portal anchored-panel hook so it
- * is never clipped by the board.
- */
+
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -60,7 +54,7 @@ export function SortMenu({ t, mode, onChange }: SortMenuProps): ReactElement {
 
   useEffect(() => {
     if (!open) return
-    // Focus the selected option so keyboard users land on the current state.
+
     const index = OPTIONS.findIndex(option => option.mode === mode)
     itemRefs.current[Math.max(0, index)]?.focus()
   }, [open, mode])

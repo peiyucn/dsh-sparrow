@@ -1,7 +1,4 @@
-/**
- * Header intro info button: official plugin-page pattern (`pageIntro` + 20px info button).
- * The tooltip is portaled so the header's clipping never affects it.
- */
+
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'

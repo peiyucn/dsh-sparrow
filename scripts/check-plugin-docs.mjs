@@ -1,11 +1,5 @@
-#!/usr/bin/env node
-/**
- * 守卫：**文档与代码 / 文档与文档之间那几件"靠人记得"的事** —— 本仓库有成对（中英双份）与成组
- * （README 插件表 / AGENTS 插件清单 / SECURITY 支持表 / package.json files）的文档，改一处忘一处没有任何症状。
- * 判据 1-8 见下方各段落标题与 `fail()` 文案。⚠️ **只比结构与集合，不比文案** —— 改措辞不该红灯，
- * 漏译一条 / 漏加一段版本必须红灯（条目口径与结构剥离见 `ITEM_RE`、`unfenced`）。
- * 退出码：0 = 一致；1 = 有漂移（逐条打印文件 + 具体差在哪）。
- */
+
+
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { activePluginNames, RETIRED_PLUGINS, repoRoot } from './plugin-set.mjs'
@@ -24,12 +18,7 @@ const read = (rel) => {
   }
 }
 
-/**
- * 剥掉 HTML 注释（`<!-- … -->`，含跨行块）与围栏代码块 —— 结构统计一律走这里：注释里的行不是文档结构，
- * 照算会让「中英两侧同时注释掉一条真条目」计数守恒、判据 5 静默放行。
- * ⚠️ 必须是逐行状态机，不能用全文 `replace(/<!--[\s\S]*?-->/g, '')`：那样行号会塌（本脚本多处按行索引），
- * 且注释块前后的内容会被粘成一行、凭空造出一个原本不存在的行首条目。
- */
+
 const unfenced = (text) => {
   const out = []
   let inFence = false
@@ -42,14 +31,14 @@ const unfenced = (text) => {
     while (rest !== '') {
       if (inComment) {
         const end = rest.indexOf('-->')
-        if (end < 0) { rest = ''; break }        // 注释块延续到下一行
+        if (end < 0) break
         inComment = false
         rest = rest.slice(end + 3)
         continue
       }
       const start = rest.indexOf('<!--')
-      if (start < 0) { stripped += rest; rest = ''; break }
-      stripped += rest.slice(0, start)            // 注释前正文保留，行号与列位不变
+      if (start < 0) { stripped += rest; break }
+      stripped += rest.slice(0, start)
       inComment = true
       rest = rest.slice(start + 4)
     }
@@ -58,29 +47,26 @@ const unfenced = (text) => {
   return out
 }
 
-/**
- * **条目行**：无序（`- ` / `* `）与有序（`1. ` / `1) `），**缩进子条目也算** —— 行首锚定会让
- * 「只在单侧加的缩进子条目」计数守恒、判据 5 静默放行；有序列表同样是"一条用户可见的条目"。
- */
+
 const ITEM_RE = /^\s*(?:[-*]|\d+[.)])\s+\S/u
 
 const countOf = (lines, re) => lines.filter(line => re.test(line)).length
 
-/** 某文件中 `##` 级标题的文本序列。 */
+
 const h2s = (text) => unfenced(text)
   .filter(line => /^##\s+\S/u.test(line))
   .map(line => line.replace(/^##\s+/u, '').trim())
 
-/** 条目数（口径见 `ITEM_RE`）。 */
+
 const topItems = (text) => countOf(unfenced(text), ITEM_RE)
 
-/** 解析 CHANGELOG 的版本段：`[{ version, items }]`，按出现顺序。 */
+
 function versionSections(text) {
   const out = []
   let current = null
   for (const line of unfenced(text)) {
-    // Keep a Changelog 格式：`## [x.y.z] - YYYY-MM-DD`（方括号包版本）。
-    // 同时接受无方括号的旧写法，避免历史文件一次性全红。
+
+
     const heading = /^##\s+\[?([0-9][^\s\]]*)\]?/u.exec(line)
     if (heading) {
       current = { version: heading[1], items: 0 }
@@ -92,7 +78,7 @@ function versionSections(text) {
   return out
 }
 
-/** 中文数字 → 阿拉伯数字（AGENTS「口径」行用中文数字）。 */
+
 const CN_DIGITS = { 〇: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 }
 function parseCnNumber(text) {
   if (/^\d+$/u.test(text)) return Number(text)
@@ -106,10 +92,10 @@ function parseCnNumber(text) {
   return CN_DIGITS[text] ?? null
 }
 
-// ─────────────────────────────────────────────────────────────
-// 判据 1 + 2：根 README 中英双份
-// ─────────────────────────────────────────────────────────────
-/** 取「插件表」区段（表头行 → 下一个 `## `）。 */
+
+
+
+
 function tableSection(text, headerRe) {
   const lines = text.split(/\r?\n/u)
   const start = lines.findIndex(line => headerRe.test(line))
@@ -118,7 +104,7 @@ function tableSection(text, headerRe) {
   return lines.slice(start + 1, end < 0 ? lines.length : end).join('\n')
 }
 
-/** 从 markdown 表格行里抽出 `plugins/<name>/…` 链接的插件名。 */
+
 function tablePlugins(body) {
   const names = new Set()
   for (const line of body.split(/\r?\n/u)) {
@@ -128,7 +114,7 @@ function tablePlugins(body) {
   return names
 }
 
-/** 取某个 `## ` 小节的正文。 */
+
 function section(text, headingRe) {
   const lines = text.split(/\r?\n/u)
   const start = lines.findIndex(line => headingRe.test(line))
@@ -150,8 +136,8 @@ for (const { file, header, retired: retiredHeading } of ROOT_READMES) {
   if (body === null) { fail(`判据 1：${file} 里找不到插件表（表头不匹配）`); continue }
   const listed = tablePlugins(body)
 
-  // The root README is the Desk One product page: Desk One is the page itself, and the table at the
-  // end only introduces the companion plugins. Keep requiring every other active plugin there.
+
+
   const requiredInTable = active.filter(name => name !== 'dsh-desk-one')
   for (const name of retired) {
     if (listed.has(name)) {
@@ -169,14 +155,14 @@ for (const { file, header, retired: retiredHeading } of ROOT_READMES) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// 判据 3：SECURITY.md 支持表
-// ─────────────────────────────────────────────────────────────
+
+
+
 {
   const security = read('SECURITY.md')
   if (security === null) fail('判据 3：读不到 SECURITY.md')
   else {
-    // 只看**表格行**：退役说明写在表下引用块里（那里必须点名它们，才说得清谁退役了）。
+
     const tableLines = security.split(/\r?\n/u).filter(line => line.trim().startsWith('|')).join('\n')
     for (const name of retired) {
       if (tableLines.includes(name)) {
@@ -189,9 +175,9 @@ for (const { file, header, retired: retiredHeading } of ROOT_READMES) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// 判据 4：AGENTS.md 插件清单 + 口径行
-// ─────────────────────────────────────────────────────────────
+
+
+
 {
   const agents = read('AGENTS.md')
   if (agents === null) fail('判据 4：读不到 AGENTS.md')
@@ -210,15 +196,15 @@ for (const { file, header, retired: retiredHeading } of ROOT_READMES) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// 判据 5 + 6 + 7：逐插件
-// ─────────────────────────────────────────────────────────────
+
+
+
 for (const name of active) {
   const dir = `plugins/${name}`
 
-  // ── 判据 7：files 清单与组合补丁必须能装出可挂载的包 ──
-  // npm pack 不会因为「patch 文件没进 files」报错：装到用户机器上的包缺 cordis.patch.yml 时，
-  // `dsh plugin add` 才在挂载阶段失败（此时包已发布，只能发补丁版）。故把这条做成 fail-closed。
+
+
+
   const pkgText = read(`${dir}/package.json`)
   let pkg = null
   if (pkgText === null) fail(`判据 7：读不到 ${dir}/package.json`)
@@ -235,7 +221,7 @@ for (const name of active) {
     if (typeof patch !== 'string' || patch.trim() === '') {
       fail(`判据 7：${dir}/package.json 缺少 dsh.bundle.patch（Loader 靠它自动挂载）`)
     } else {
-      // 文件清单里可能写 `./cordis.patch.yml`，也可能省略 `./`；两种都算已收录。
+
       const patchPath = patch.replace(/^\.\//u, '')
       if (!existsSync(join(repoRoot, dir, patchPath))) {
         fail(`判据 7：${dir}/package.json 的 dsh.bundle.patch 指向不存在的文件 ${patch}`)
@@ -245,7 +231,7 @@ for (const name of active) {
     }
   }
 
-  // ── 判据 5：中英双份的四份文档 ──
+
   for (const [kind, en, zh, crossEn, crossZh] of [
     ['README', `${dir}/README.md`, `${dir}/README.zh-CN.md`, 'README.zh-CN.md', 'README.md'],
     ['CHANGELOG', `${dir}/CHANGELOG.md`, `${dir}/CHANGELOG.zh-CN.md`, 'CHANGELOG.zh-CN.md', 'CHANGELOG.md'],
@@ -257,7 +243,7 @@ for (const name of active) {
     for (const [file, text] of [[en, a], [zh, b]]) {
       if (!/^#\s+\S/u.test(text.split(/\r?\n/u)[0] ?? '')) fail(`判据 5：${file} 第一行不是 H1`)
     }
-    // 顶部互链（前 8 行）
+
     if (!unfenced(a).slice(0, 8).join('\n').includes(crossEn)) fail(`判据 5：${en} 顶部缺少指向 ${crossEn} 的互链`)
     if (!unfenced(b).slice(0, 8).join('\n').includes(crossZh)) fail(`判据 5：${zh} 顶部缺少指向 ${crossZh} 的互链`)
 
@@ -267,7 +253,7 @@ for (const name of active) {
     const ia = topItems(a), ib = topItems(b)
     if (ia !== ib) fail(`判据 5：${name} ${kind} 的条目数中英不一致（EN ${ia} / ZH ${ib}）—— 漏译或漏加一条（无序/有序、含缩进子条目）`)
 
-    // ── 判据 6：CHANGELOG 版本段 ──
+
     if (kind === 'CHANGELOG' && pkg !== null) {
       const se = versionSections(a), sz = versionSections(b)
       if (se.length !== sz.length) fail(`判据 6：${name} CHANGELOG 版本段数中英不一致（EN ${se.length} / ZH ${sz.length}）`)
@@ -287,7 +273,7 @@ for (const name of active) {
     }
   }
 
-  // ── 判据 8：README 里 plugins/ 相对链接都存在 ──
+
   for (const file of [`${dir}/README.md`, `${dir}/README.zh-CN.md`]) {
     const text = read(file)
     if (text === null) continue
@@ -297,7 +283,7 @@ for (const name of active) {
   }
 }
 
-// 根 README 的 plugins/ 链接一并查
+
 for (const file of ['README.md', 'README.zh-CN.md']) {
   const text = read(file)
   if (text === null) continue
@@ -306,9 +292,9 @@ for (const file of ['README.md', 'README.zh-CN.md']) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// 报告
-// ─────────────────────────────────────────────────────────────
+
+
+
 if (violations.length > 0) {
   console.error(`check-plugin-docs: ❌ 文档与代码 / 文档与文档之间不一致（${violations.length} 处）\n`)
   for (const v of violations) console.error(`  · ${v}`)

@@ -1,8 +1,4 @@
-/**
- * 每轮积分胶囊：挂官方 conversation.chat.assistant-actions 槽位（官方渲染在复制与分支之间），我们 DOM 级把自有节点
- * 移到行动作行末尾——只移动自有节点，不包装/替换官方组件；点击展开 CreditDialog 共享的官方同款材质面板。
- * 数据走 host /turn-usage 路由（按 sessionId+turn 记账）；该轮没有 CodeBuddy 调用（calls=0）时不渲染。
- */
+
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -16,15 +12,15 @@ import { CCB_CLASS } from './styles.js'
 
 const TURN_USAGE_URL = `${API_PREFIX}/turn-usage`
 
-/** 每轮积分视图（host /turn-usage 响应）。 */
+
 export interface TurnUsageView {
   credit: number
   calls: number
-  /** 按模型聚合的调用明细（同模型多次调用合并一行）。 */
+
   byModel: ReadonlyArray<{ model: string; credit: number; calls: number }>
 }
 
-/** 官方 ChatSnapshot 的最小面（turn-tail 节点的 closing 记录 messageId）。 */
+
 interface SnapshotLike {
   order?: readonly string[]
   nodes?: {
@@ -37,11 +33,11 @@ interface SnapshotLike {
 
 export interface CodeBuddyTurnCreditProps {
   t: (key: string, vars?: Record<string, string>) => string
-  /** 槽位 owner：完成态的 assistant 消息 id。 */
+
   messageId: string
-  /** 会话标准套件（ui-session）。 */
+
   sessionId: string
-  /** 会话标准套件（ui-chat）：ChatSnapshot 选择器。 */
+
   useChat: <T>(selector: (snapshot: SnapshotLike) => T) => T
 }
 
@@ -50,7 +46,7 @@ export function CodeBuddyTurnCredit({ t, messageId, sessionId, useChat }: CodeBu
   const buttonRef = useRef<HTMLButtonElement | null>(null)
   const { open, toggle, panelRef, anchorName } = useCreditStatDialog(buttonRef)
 
-  // 每次渲染后重跑：官方行可能因任何信号重渲染把我们移回原位；只移动自有节点，幂等。
+
   useEffect(() => {
     const pill = buttonRef.current
     if (pill === null) return
@@ -59,8 +55,8 @@ export function CodeBuddyTurnCredit({ t, messageId, sessionId, useChat }: CodeBu
     row.appendChild(pill)
   })
 
-  // messageId → turn：扫描快照里的 turn-tail 节点（官方同款关联：closing.
-  // finalNode.messageId）。找不到（历史未装载/非完成态）返回 null → 不渲染。
+
+
   const turn = useChat((snapshot) => {
     const nodes = snapshot.nodes
     if (nodes === undefined) return null
@@ -83,7 +79,7 @@ export function CodeBuddyTurnCredit({ t, messageId, sessionId, useChat }: CodeBu
     return () => { alive = false }
   }, [sessionId, turn])
 
-  // 未取到用量或无 CodeBuddy 调用（calls=0）时不渲染。
+
   if (usage === undefined || usage.calls === 0) return null
 
   return (

@@ -1,4 +1,4 @@
-/** Drag ghosts: the card clone that follows the pointer. */
+
 
 export const TASK_DRAG_CSS = `
 /* Ghost card that follows the pointer while dragging. */

@@ -1,4 +1,4 @@
-/** One collapsible task group inside a lane, holding its cards and drop target. */
+
 
 import { useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
@@ -15,7 +15,7 @@ interface TaskGroupBlockProps {
   readonly collapsed: boolean
   readonly over: boolean
   readonly dragging: boolean
-  /** Card insertion index inside this group, or null when another target is active. */
+
   readonly dropIndex: number | null
   readonly draft: boolean
   readonly t: DeskTranslator
@@ -30,10 +30,7 @@ interface TaskGroupBlockProps {
   readonly onCancelDraft: () => void
 }
 
-/**
- * One group as a lane block: two-row header (name + count) plus its card list. The drag gesture
- * starts from the header; cards inside keep their own drag handlers.
- */
+
 export function TaskGroupBlock({
   group, tasks, status, countLabel, collapsed, over, dragging, dropIndex, draft, t,
   renderTask, onStartDrag, onToggleGroup, onRenameGroup, onAdd, onRemoveGroup, onArchiveGroup,
@@ -181,8 +178,8 @@ export function TaskGroupBlock({
               onDoubleClick={(event) => {
                 const target = event.target as HTMLElement
                 if (target.closest('[data-task-id],input,textarea,button')) return
-                // The lane-level double-click handler ignores block descendants; handle the group
-                // body here so "double-click to add" creates a card inside THIS group.
+
+
                 event.stopPropagation()
                 onAdd(status, group.id)
               }}

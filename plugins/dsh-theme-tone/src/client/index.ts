@@ -43,6 +43,38 @@ interface Scope {
 const DEBUG_GROUPS = ['backdrop', 'glass', 'navpin', 'surfaces'] as const
 type DebugGroup = typeof DEBUG_GROUPS[number]
 
+interface ThemeFace {
+  getTheme(): { active: { colorScheme: ColorScheme } }
+  overrideTokens(owner: string, overrides: Record<string, unknown>): () => void
+}
+
+interface SlotFace {
+  inject(name: string, register: () => unknown): void
+  register(entry: {
+    name: string
+    id: string
+    order: number
+    locale: string
+    store: unknown
+    inject: (actions: unknown) => ThemeToneRowInjected
+  }, component: (props: object) => unknown): unknown
+}
+
+interface ClientContext {
+  theme: ThemeFace
+  slots: SlotFace
+  locale: { register(namespace: string, dictionaries: { zh: Record<string, string>; en: Record<string, string> }): () => void }
+  configForms: { get(namespace: string): Scope }
+  logger?: { warn(message: string): void }
+  effect(callback: () => () => void, label: string): void
+  on(event: string, callback: (snapshot: { active: { colorScheme: ColorScheme } }) => void): void
+  inject(services: string[], callback: (context: ClientContext) => void): void
+}
+
+interface BoundRowActions {
+  sync(colorScheme: ColorScheme, tone: ToneId, revision: number): void
+}
+
 function offGroups(): ReadonlySet<DebugGroup> {
   try {
     const raw = new URLSearchParams(window.location.search).get('dshtone-off') ?? ''
@@ -55,8 +87,8 @@ function offGroups(): ReadonlySet<DebugGroup> {
 
 export const inject = ['slots', 'theme', 'locale']
 
-export async function apply(ctx: never): Promise<void> {
-  const c = ctx as unknown as Record<string, any>
+export async function apply(ctx: ClientContext): Promise<void> {
+  const c = ctx
   if (!warnMissingCapabilities(c, name, [
     { name: 'ctx.theme.getTheme', ok: hasCapability(() => c.theme?.getTheme) },
     { name: 'ctx.theme.overrideTokens', ok: hasCapability(() => c.theme?.overrideTokens) },
@@ -65,11 +97,11 @@ export async function apply(ctx: never): Promise<void> {
     { name: 'ctx.locale.register', ok: hasCapability(() => c.locale?.register) },
     ...REQUIRED_CSS_FEATURES.map(feature => ({ name: `CSS ${feature.name}`, ok: cssSupports(feature.probe) })),
   ])) return
-  c.inject(['configForms'], (settingsCtx: never) => install(settingsCtx as never))
+  c.inject(['configForms'], (settingsCtx) => install(settingsCtx))
 }
 
-function install(ctx: never): void {
-  const c = ctx as unknown as Record<string, any>
+function install(ctx: ClientContext): void {
+  const c = ctx
   const markerHost: HTMLElement | null = document.body
   const off = offGroups()
 
@@ -117,7 +149,7 @@ function install(ctx: never): void {
   const pendingTones = createPendingToneTracker()
 
   let disposeTokens: (() => void) | undefined
-  let boundRow: any
+  let boundRow: BoundRowActions | undefined
   let lastTokenKey = ''
   let revision = 0
   let localSettings: ThemeToneSettings = DEFAULT_SETTINGS
@@ -207,7 +239,7 @@ function install(ctx: never): void {
     if (snapshot.status === 'loading') return
     if (snapshot.status === 'ready' && snapshot.writable) return
     warned = true
-    warnUser(c as never, `${name}: 本次会话的设置无法写入宿主；色调仍在本次会话内生效，但不会持久化。`)
+    warnUser(c, `${name}: 本次会话的设置无法写入宿主；色调仍在本次会话内生效，但不会持久化。`)
   }
 
   c.slots.inject(ROW_SLOT, () => c.slots.register({
@@ -216,8 +248,8 @@ function install(ctx: never): void {
     order: ROW_ORDER,
     locale: LOCALE_NAMESPACE,
     store: rowStore,
-    inject: (actions: any): ThemeToneRowInjected => {
-      boundRow = actions
+    inject: (actions: unknown): ThemeToneRowInjected => {
+      boundRow = actions as BoundRowActions
       repaint()
       return {
         setTone: (id: ToneId, scheme: ColorScheme) => {

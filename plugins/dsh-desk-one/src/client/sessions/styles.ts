@@ -1,4 +1,4 @@
-/** Session archive management CSS (A2). */
+
 
 export const SESSIONS_CSS = `
 .dsh-desk-archive-list {

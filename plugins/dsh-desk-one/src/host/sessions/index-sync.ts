@@ -1,4 +1,4 @@
-/** Build the session index from host header facts: metadata only, never transcript content. */
+
 
 import type { Context } from '@deepseek-ai/cordis'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -12,11 +12,7 @@ import type { HeaderFacts } from './headers.js'
 import type { SessionIndexDraft } from './records.js'
 import { titlesFor } from './titles.js'
 
-/**
- * Read every persisted header once, resolve titles through the same three-tier chain as the
- * archive tree, and return FK rows for the unified `nodes` table. Availability distinguishes
- * active vs archived; running comes from the live agent registry.
- */
+
 export async function buildSessionIndex(
   ctx: Context,
   headerFacts: HeaderFactsStore<HeaderFacts>,

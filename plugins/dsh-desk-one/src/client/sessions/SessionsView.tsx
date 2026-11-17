@@ -1,8 +1,4 @@
-/**
- * Sessions (agent sessions) view: active catalog (client snapshot) plus archive management
- * (Phase 3/A2, host routes). Active rows can be archived or moved to trash; archived / stray /
- * trash operations live in ArchiveSections and all mutations go through the host's routes.
- */
+
 
 import { useCallback, useState } from 'react'
 import type { ReactElement } from 'react'
@@ -85,10 +81,9 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hidden, setHidden] = useState<Set<string>>(new Set())
-  /** Bumped after an active row is archived so the archive pane reloads its own snapshot. */
+
   const [archiveRefresh, setArchiveRefresh] = useState(0)
-  /** Ids the archive sections already show; keep them out of the active catalog even while the
-   *  official session list still carries their rows (a trash move leaves that list stale). */
+
   const [known, setKnown] = useState<KnownSessions>({ archived: new Set(), trashed: new Set() })
   const activeSessions = excludeKnownSessions(snapshot.sessions, known)
   const onKnownChange = useCallback((next: KnownSessions): void => {
@@ -119,7 +114,7 @@ export function SessionsView({ snapshot, t, onOpen, archive }: SessionsViewProps
     })
   }
   type ActiveNode = { session: SessionChipInfo; depth: number; childCount: number; children: ActiveNode[] }
-  /** Parent-first flat rows -> nested tree, so children can live in a real nested list with one rail. */
+
   const treeOf = (rows: readonly { session: SessionChipInfo; depth: number; childCount: number }[]): ActiveNode[] => {
     const roots: ActiveNode[] = []
     const stack: ActiveNode[] = []

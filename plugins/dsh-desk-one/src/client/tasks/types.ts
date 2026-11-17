@@ -1,4 +1,4 @@
-/** Board-only view types: a lane is ONE ordered sequence of blocks (ungrouped cards + groups). */
+
 
 import type { DeskTask, DeskTaskGroup, TaskStatus } from '../../contract.js'
 import { sortGroups, sortTasks } from '../../model.js'
@@ -12,12 +12,12 @@ interface LaneGroup {
   readonly tasks: readonly DeskTask[]
 }
 
-/** One top-level item in a lane: a single ungrouped card, or one group block with its cards. */
+
 export type LaneBlock =
   | { readonly kind: 'task'; readonly task: DeskTask }
   | { readonly kind: 'group'; readonly group: DeskTaskGroup; readonly tasks: readonly DeskTask[] }
 
-/** One lane as rendered: ungrouped cards and group blocks share a single manual sequence. */
+
 export interface LaneView {
   readonly ungrouped: readonly DeskTask[]
   readonly groups: readonly LaneGroup[]
@@ -31,14 +31,11 @@ interface LaneParts {
   readonly groups: readonly LaneGroup[]
   readonly taskBlocks: readonly LaneBlock[]
   readonly groupBlocks: readonly LaneBlock[]
-  /** True when the two legacy order spaces are disjoint enough to merge into one exact sequence. */
+
   readonly unified: boolean
 }
 
-/**
- * Ordering inside one container (a group's card list). Manual is the persisted `order`; the other
- * modes are view-only overrides that never write back.
- */
+
 export function sortContainer(tasks: readonly DeskTask[], mode: TaskSortMode): DeskTask[] {
   if (mode === 'manual') return sortTasks(tasks)
   if (mode === 'created') return [...tasks].sort((left, right) =>
@@ -54,11 +51,7 @@ function blockOrder(block: LaneBlock): number {
   return block.kind === 'group' ? block.group.order : block.task.order
 }
 
-/**
- * Legacy boards kept separate order spaces for ungrouped cards and groups. Only disjoint values
- * can be merged exactly; otherwise the lane renders "cards first, then groups" until its first
- * structural drag renumbers every block.
- */
+
 function hasUnifiedOrder(blocks: readonly LaneBlock[]): boolean {
   const seen = new Set<number>()
   for (const block of blocks) {
@@ -75,7 +68,7 @@ function orderedBlocks(parts: LaneParts, mode: TaskSortMode): LaneBlock[] {
   return merged.sort((left, right) => blockOrder(left) - blockOrder(right))
 }
 
-/** Single lane builder shared by rendering and drag/insert math. */
+
 function laneParts(
   tasks: readonly DeskTask[],
   groups: readonly DeskTaskGroup[],
@@ -108,10 +101,7 @@ function laneParts(
   }
 }
 
-/**
- * Manual block sequence used for drag/insert math, regardless of the current sort view: ungrouped
- * cards first when the lane still has legacy split order spaces, otherwise sorted by block order.
- */
+
 export function manualBlocks(
   tasks: readonly DeskTask[],
   groups: readonly DeskTaskGroup[],
@@ -120,7 +110,7 @@ export function manualBlocks(
   return orderedBlocks(laneParts(tasks, groups, status, 'manual'), 'manual')
 }
 
-/** Build one lane's view; non-manual sort modes keep the legacy (cards then groups) layout. */
+
 function buildLane(
   tasks: readonly DeskTask[],
   groups: readonly DeskTaskGroup[],
@@ -135,7 +125,7 @@ function buildLane(
   }
 }
 
-/** Group all non-archived tasks into the three fixed lanes, with one manual block sequence each. */
+
 export function groupLanes(
   tasks: readonly DeskTask[],
   groups: readonly DeskTaskGroup[],
@@ -148,13 +138,7 @@ export function groupLanes(
   }
 }
 
-/**
- * Replace one task's linked-session list, leaving every other task untouched.
- *
- * The host patch replaces the whole `sessionIds` array, so the client must apply the click
- * optimistically: two quick toggles would otherwise both start from the same stale list and the
- * later save would silently drop the earlier pick.
- */
+
 export function withLinkedSessions(
   tasks: readonly DeskTask[],
   taskId: string,

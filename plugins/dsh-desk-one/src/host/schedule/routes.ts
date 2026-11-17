@@ -1,4 +1,4 @@
-/** Schedule REST table: read-only events, calendar source metadata and connection management. */
+
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import {
@@ -64,8 +64,8 @@ async function updateCalendar(route: DeskRouteContext, req: IncomingMessage): Pr
   }
   const schedule = scheduleOf(route)
   const updated = await route.store.updateCalendar(body.id, body.expectedRevision, patch)
-  // Turning per-calendar sync off also drops its mirrored events, so stale/leftover calendars
-  // stop contributing data immediately instead of lingering until the next full sync.
+
+
   if (patch.enabled === false) await route.store.syncCalendarEvents(updated, [])
   return schedule.state()
 }
@@ -99,7 +99,7 @@ async function outlookCallback(route: DeskRouteContext, req: IncomingMessage, re
   const result = params.get('error') === null
     ? await scheduleOf(route).completeOutlookLogin(params.get('code') ?? '', params.get('state') ?? '')
     : { ok: false, message: params.get('error_description') ?? params.get('error') ?? 'Microsoft 拒绝了登录' }
-  // Escape + nonce CSP live in callback-page.ts: the message may be attacker-supplied.
+
   const page = renderOutlookCallbackPage(result)
   res.writeHead(result.ok ? 200 : 400, {
     'content-type': 'text/html; charset=utf-8',
@@ -129,7 +129,7 @@ async function removeSubscription(route: DeskRouteContext, req: IncomingMessage)
   return scheduleOf(route).removeSubscription(body.id)
 }
 
-/** Route table appended to the desk router; the trust fence and error mapping stay in router.ts. */
+
 export const SCHEDULE_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'GET', path: ROUTES.scheduleEvents, handle: (route, req, res) => reply(res, getEvents(route, req)) },
   { method: 'GET', path: ROUTES.scheduleCalendars, handle: (route, _req, res) => reply(res, getCalendars(route)) },

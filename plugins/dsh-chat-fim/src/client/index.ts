@@ -1,17 +1,9 @@
-/**
- * dsh-chat-fim client half：开关挂 `conversation.input.left`（输入框工具行），
- * 数据面挂 `conversation.input.dock`（读 InputZone 草稿快照、无可见 UI；
- * 不挂 `conversation.composer.dock`——dsh shell 在 hero 状态（新会话页）不渲染它，
- * 而 input.dock 在 hero 下同样挂载，否则新会话第一条草稿永远没有联想），
- * 候选菜单挂 `conversation.input.overlay`（官方 @ 列表同款悬浮卡），
- * 建议请求全部走 host 自有路由。文案经 dsh locale 服务（zh/en）。
- * 不 import Node 模块；API key 不进浏览器。
- */
+
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-// Type-only：拉入 ui-renderer 的 SlotRegistry 服务合并（ctx.slots），
-// 以及 sessions / modelDirectories 两个客户端服务的声明（官方 0.1.7 起分散在各包）。
+
+
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-model-selection/client'
@@ -23,7 +15,7 @@ import {
   SLOT_INPUT_OVERLAY, SLOT_ORDER, SUPPORT_CHECK_TIMEOUT_MS, SWITCH_SLOT_ID, name,
 } from '../constants.js'
 import { warnMissingCapabilities } from '../compat.js'
-import { clientCapabilities } from './capabilities.js'
+import { clientCapabilities, type ClientCapabilityHost } from './capabilities.js'
 import { ChatFimDock } from './ChatFimDock.js'
 import { ChatFimMenu } from './ChatFimMenu.js'
 import { ChatFimSwitch } from './ChatFimSwitch.js'
@@ -41,7 +33,7 @@ export interface ChatFimResponse {
   readonly error?: { readonly code?: string; readonly message?: string }
 }
 
-/** 本插件的 locale 字典（经 locale.d.ts 的 LocaleNamespaceMap 扩充做类型化注册）。 */
+
 const LOCALE_DICTS = {
   zh: {
     'switch.label': 'FIM',
@@ -81,7 +73,7 @@ const LOCALE_DICTS = {
   },
 } as const
 
-/** 同一 TS 程序里 host/client 的 Context.sessions 声明会冲突，这里只取客户端需要的最小面。 */
+
 interface ClientSessionScope {
   scope(sessionId: SessionId): ClientAgentScope | undefined
 }
@@ -90,13 +82,10 @@ interface ClientAgentScope extends Context {
   bail(subject: Context, event: string, payload: unknown): unknown
 }
 
-/**
- * client half 入口：先跑不抛错的能力门（缺任一服务即惰性停用），再注册样式 / locale 字典与三个槽位。
- * @param ctx - 浏览器侧 Cordis 上下文。
- */
+
 export function apply(ctx: Context): void {
-  // 客户端 boot 审计把「任一 entry 非 active」当致命失败，故这里只告警 + return，绝不抛错。
-  const c = ctx as unknown as Record<string, any>
+
+  const c = ctx as unknown as ClientCapabilityHost & { logger?: { warn(message: string): void } }
   if (!warnMissingCapabilities(c, PACKAGE_NAME, clientCapabilities(c))) return
   const sessions = ctx.sessions as unknown as ClientSessionScope
   const styles = ensureChatFimStyles()
@@ -105,8 +94,8 @@ export function apply(ctx: Context): void {
   ctx.effect(() => disposeDictionaries, `${name}: locale dictionaries`)
 
   const injectedFace = (rawSessionId: string) => {
-    // 官方 slot 的 `inject` 工厂签名是 `(sessionId: string) => …`（rc.1 契约）；
-    // SessionId 是编译期品牌、运行期就是同一个字符串，故在边界处收口一次。
+
+
     const sessionId = rawSessionId as unknown as SessionId
     const scope = sessions.scope(sessionId)
     if (scope === undefined) {
@@ -114,8 +103,8 @@ export function apply(ctx: Context): void {
     }
     return {
       sessionId,
-      // 官方共享模型目录（与模型座位同 store）：开关随选中模型即时追平，
-      // 不再只等切会话。目录服务缺失（旧版 dsh）时 fail-soft。
+
+
       directoryFor: (id: SessionId): FimDirectoryStore | undefined => {
         try {
           const resolver = ctx.root.get('modelDirectories') as unknown as {
@@ -126,13 +115,7 @@ export function apply(ctx: Context): void {
           return undefined
         }
       },
-      /**
-       * 查询当前会话主模型是否支持（deepseek 系列）。
-       * 返回 `true` / `false` = 宿主给出定论；`null` = 宿主**现在判不了**
-       * （冷启动尚未激活该会话 → 404 UNKNOWN_SESSION、路由不可达、响应不是 JSON）。
-       * 「判不了」绝不能与「判为不支持」混为一谈：旧实现把两者都当支持（fail-open），
-       * 于是冷启动那一发 404 会把开关钉在常显状态——调用方按 null 做有界补查。
-       */
+
       checkSupport: async (id: SessionId): Promise<boolean | null> => {
         let response: Response
         try {
@@ -140,11 +123,11 @@ export function apply(ctx: Context): void {
             signal: AbortSignal.timeout(SUPPORT_CHECK_TIMEOUT_MS),
           })
         } catch {
-          return null // 网络/超时：判不了（补查自愈），不是「不支持」。
+          return null
         }
-        // 路由不可达（宿主尚无该路由）或宿主明确说会话不可用：都属「现在判不了」。
+
         if (!response.ok) return null
-        // 响应不是 JSON（反向代理错误页等）同样判不了。
+
         const payload = parseJsonOrNull(await response.text()) as { supported?: unknown } | null
         if (payload === null || typeof payload.supported !== 'boolean') return null
         return payload.supported
@@ -153,10 +136,10 @@ export function apply(ctx: Context): void {
         const response = await fetch(COMPLETE_ROUTE_PATH, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          // 续写模型跟随主模型（2026-08-31 用户拍板：用户选什么模型，suggest 就用什么模型；
-          // host 侧 resolveSuggestModel 按会话事件现读主路由，vision/未知回退配置默认）。
-          // 2026-09-10：pro/flash 两档退役，客户端不再传模型档位。
-          // 语言由 host 按草稿内容自适应（detectDraftLanguage），客户端不再传 locale。
+
+
+
+
           body: JSON.stringify({ sessionId: id, prompt }),
           signal,
         })
@@ -177,8 +160,8 @@ export function apply(ctx: Context): void {
           },
         }
       },
-      // `_sessionId` 是契约形参（`ChatFimDockInjected.adopt`），但 scope 已按会话闭包捕获，
-      // 实现里用不到它 —— 前缀下划线即 `noUnusedParameters` 认可的有意不用。
+
+
       adopt: (_sessionId: SessionId, text: string, span: TokenSpan): boolean =>
         scope.bail(scope, 'slash/input-insert-text', { text, span }) === true,
     }

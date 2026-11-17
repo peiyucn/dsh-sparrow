@@ -1,4 +1,4 @@
-/** Task-group repository: one-level groups owned by a lane, including the lane/order cascades. */
+
 
 import { randomUUID } from 'node:crypto'
 import { TASK_STATUSES } from '../../constants.js'
@@ -8,7 +8,7 @@ import {
 import type { DeskTask, DeskTaskGroup, TaskStatus } from '../../contract.js'
 import type { StoreCore } from './core.js'
 
-/** Creation input accepted by `createGroup` (unknown fields are validated by the model). */
+
 export interface CreateGroupInput {
   readonly name?: unknown
   readonly status?: unknown
@@ -18,7 +18,7 @@ export interface CreateGroupInput {
 export class GroupRepository {
   constructor(private readonly core: StoreCore) {}
 
-  /** List groups in board order (all lanes unless the caller filters). */
+
   listGroups(query?: string, limit?: number): DeskTaskGroup[] {
     const groups = this.core.allNodes().filter((node): node is DeskTaskGroup => node.kind === 'group')
     const filtered = filterGroups(sortGroups(groups), query)
@@ -27,13 +27,13 @@ export class GroupRepository {
     return bounded === 0 ? filtered : filtered.slice(0, bounded)
   }
 
-  /** One group node by id (kind-narrowed; shared with the task repository's membership rules). */
+
   groupById(id: string): DeskTaskGroup | undefined {
     const node = this.core.nodes.get(id)
     return node !== undefined && node.kind === 'group' ? node : undefined
   }
 
-  /** Groups of one lane in manual order (used to keep group order dense after edits). */
+
   private laneGroups(status: TaskStatus): DeskTaskGroup[] {
     return sortGroups(this.core.allNodes().filter(
       (node): node is DeskTaskGroup => node.kind === 'group' && node.status === status,
@@ -52,7 +52,7 @@ export class GroupRepository {
     return group
   }
 
-  /** Rename / reorder one group; lane moves go through `moveGroup` because they cascade to tasks. */
+
   async updateGroup(id: string, expectedRevision: number, patch: GroupPatch): Promise<DeskTaskGroup> {
     const now = new Date().toISOString()
     try {
@@ -73,7 +73,7 @@ export class GroupRepository {
     }
   }
 
-  /** Write dense 0..n-1 group orders; only records whose order actually changed are rewritten. */
+
   private async applyGroupOrders(ordered: readonly DeskTaskGroup[], now: string): Promise<DeskTaskGroup[]> {
     const updated: DeskTaskGroup[] = []
     for (const [index, group] of ordered.entries()) {
@@ -89,10 +89,7 @@ export class GroupRepository {
     return updated
   }
 
-  /**
-   * Move a group to a lane / position. Same-lane moves only reorder groups; cross-lane moves
-   * cascade the new status to every member task (the group remains their container).
-   */
+
   async moveGroup(
     id: string,
     expectedRevision: number,
@@ -127,7 +124,7 @@ export class GroupRepository {
           : node)
         if (next.kind === 'task') updatedTasks.push(next)
       }
-      // Close the gap the group left behind in its old lane.
+
       await this.applyGroupOrders(this.laneGroups(current.status), now)
     }
 
@@ -138,7 +135,7 @@ export class GroupRepository {
     return { group: ordered.find(group => group.id === id) ?? movedGroup, tasks: updatedTasks }
   }
 
-  /** Archive / restore a group together with every card in it (archive is Done-lane only). */
+
   async archiveGroup(
     id: string,
     expectedRevision: number,
@@ -164,13 +161,13 @@ export class GroupRepository {
     return { group: updated, tasks }
   }
 
-  /** Delete a group; its cards become ungrouped (explicit delete only — empty groups persist). */
+
   async deleteGroup(id: string): Promise<boolean> {
     const current = this.groupById(id)
     if (current === undefined) throw new DeskModelError('UNKNOWN_GROUP', `分组不存在：${id}`)
     const now = new Date().toISOString()
     if (current.archived) {
-      // Archived groups own archived cards: permanent delete removes them too.
+
       for (const task of this.core.allTasks().filter(task => task.groupId === id)) {
         await this.core.nodes.delete(task.id)
       }

@@ -1,7 +1,4 @@
-/**
- * Group collection state: groups are first-class host records (name / lane / order), so the
- * client never invents group metadata. Writes are optimistic and serialized per group id.
- */
+
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CreateTaskGroupRequest, DeskTask, DeskTaskGroup, TaskGroupPatchRequest, TaskStatus } from '../../../contract.js'
@@ -39,16 +36,16 @@ export interface GroupsData {
   readonly reload: () => Promise<void>
   readonly createGroup: (input: CreateTaskGroupRequest) => Promise<DeskTaskGroup | null>
   readonly renameGroup: (group: DeskTaskGroup, name: string) => void
-  /** Persist group orders: order is the block index in the lane's unified sequence. */
+
   readonly setGroupOrders: (entries: readonly { group: DeskTaskGroup; order: number }[]) => void
   readonly removeGroup: (group: DeskTaskGroup) => void
-  /** Cross-lane move; resolves the moved group, its cards, and the authoritative group list. */
+
   readonly moveGroupToLane: (group: DeskTaskGroup, status: TaskStatus, order?: number) => Promise<{
     group: DeskTaskGroup
     tasks: readonly DeskTask[]
     groups: readonly DeskTaskGroup[]
   } | null>
-  /** Archive / restore the group together with its cards. */
+
   readonly archiveGroup: (group: DeskTaskGroup, archived: boolean) => Promise<{
     group: DeskTaskGroup
     tasks: readonly DeskTask[]
@@ -159,8 +156,8 @@ export function useGroupsData(t: DeskTranslator, actions: Actions): GroupsData {
   const moveGroupToLane = useCallback(async (group: DeskTaskGroup, status: TaskStatus, order?: number) => {
     try {
       const result = await moveGroup({ id: group.id, expectedRevision: group.revision, status, order })
-      // The route returns the authoritative group list after the move; old hosts without that
-      // field fall back to one GET so this client also works before the host restart.
+
+
       let latestGroups = (result as { groups?: readonly DeskTaskGroup[] }).groups
       if (latestGroups === undefined) {
         try {

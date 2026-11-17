@@ -6,34 +6,34 @@ import {
 import { BACKDROP_GRADIENTS, DITHER_SIZE, DITHER_TILE } from './backdrop.js'
 
 export const HEADER_HEIGHT_PX = 76
-/** 输入框的背景模糊：低饱和、略提亮，保留磨砂感又不把背后的正文糊成色块。 */
+
 export const COMPOSER_BLUR = 'blur(16px) saturate(105%) brightness(1.14)'
-/** 顶栏 / 右栏两条带的背景模糊（沿用调整前的冷调提亮配方）。 */
+
 export const GLASS_BLUR = 'blur(24px) saturate(170%) brightness(1.04)'
-/** 顶栏填充浓度：调整前是 40%，压亮度后为 54%（不压到输入框的 62%，金色光仍保留）。 */
+
 export const BAR_FILL_ALPHA = 0.54
-/** 顶栏金光叠加强度：相对地面层光 alpha 的百分比（85% 实测金光可见且与左栏同色）。 */
+
 export const BAR_GOLD_PERCENT = 85
-/** 输入框遮罩比例；越大越不透明、越不显背景色。 */
+
 export const COMPOSER_VEIL_PERCENT = 62
-/** 暗色玻璃的「抬亮」比例：底色里掺入抬升面（bg-layer-3）的颜色，避免整块死黑；0 = 纯黑。 */
+
 export const COMPOSER_LIFT_PERCENT = 40
-/** 浅色轴的遮罩用接近底色的乳白：`label-primary` 在浅色轴是深色，叠出来会发灰。 */
+
 export const COMPOSER_VEIL_PERCENT_LIGHT = 60
-/** 输入框边缘光：中段亮芯（px 半径）——「光打在玻璃上」的那点亮，不是描边。 */
+
 export const COMPOSER_CORE_WIDTH_PX = 1.5
-/** 输入框边缘光：软晕的纵向半径（px）；贴着边收住，不往卡面里铺开。 */
+
 export const COMPOSER_BLOOM_WIDTH_PX = 5
-/** 亮芯 / 软晕的 alpha（中段）；上下同款、左右同款。 */
+
 export const COMPOSER_CORE_ALPHA = 0.08
 export const COMPOSER_CORE_ALPHA_LIGHT = 0.05
 
 const P = `body:not([${PLAIN_ATTR}])`
 
-/** 右栏顶部两条 38px 带的合成高度（dockkit 条 + 各标签自己的头行）。 */
+
 export const PANEL_BAND_PX = 38
 
-/** 把地面三光按指定视口尺寸 / 位置铺开（顶栏、右栏、补缝层共用同一份光）。 */
+
 function viewportLight(position: string, size = '100vw 100vh'): string {
   return `  background-image: ${BACKDROP_GRADIENTS};
   background-size: ${size};
@@ -41,10 +41,7 @@ function viewportLight(position: string, size = '100vw 100vh'): string {
   background-repeat: no-repeat;`
 }
 
-/**
- * 暗色玻璃材质：底色 + 抬升面按比例混成深色膜，再按遮罩浓度半透明铺开，配低饱和模糊。
- * 输入框专用（顶栏 / 右栏两条带走 barGlass）。
- */
+
 function darkGlassFilm(): string {
   return `  background-color: color-mix(in srgb,
     color-mix(in srgb, var(--dsw-alias-bg-base) ${100 - COMPOSER_LIFT_PERCENT}%, var(--dsw-alias-bg-layer-3) ${COMPOSER_LIFT_PERCENT}%) ${COMPOSER_VEIL_PERCENT}%,
@@ -52,11 +49,7 @@ function darkGlassFilm(): string {
   backdrop-filter: ${COMPOSER_BLUR};`
 }
 
-/**
- * 顶栏 / 右栏两条带的材质：调整前的冷调模糊 + 与地面层同相位的金色光（{@link BAR_GOLD_PERCENT}）。
- * 金光按视口坐标（fixed）叠加，与左栏顶部取的是同一片光；只叠顶部 / 左侧两段，底部那段顶栏用不到。
- * 双份全强度光会发红，所以按百分比收敛。
- */
+
 function barGlass(): string {
   const top = `color-mix(in srgb, var(--dsh-theme-tone-top, transparent) ${BAR_GOLD_PERCENT}%, transparent)`
   const left = `color-mix(in srgb, var(--dsh-theme-tone-left, transparent) ${BAR_GOLD_PERCENT}%, transparent)`
@@ -73,10 +66,7 @@ function barGlass(): string {
   background-attachment: fixed, fixed;`
 }
 
-/**
- * 输入框四条边的光：**贴边的亮芯 + 短软晕**，两端自然淡出；上 / 下同款、左 / 右同款。
- * 光贴着边收住（晕开半径小、多段缓出），不往卡面里铺 ⇒ 读作光打在玻璃边上，不是描边也不糊面。
- */
+
 function composerEdgeLight(coreAlpha: number): string {
   const a = coreAlpha
   const stops = `rgba(255, 255, 255, ${a}) 0%, rgba(255, 255, 255, ${a * 0.4}) 34%, rgba(255, 255, 255, ${a * 0.1}) 70%, rgba(255, 255, 255, 0) 100%`
@@ -92,10 +82,7 @@ function composerEdgeLight(coreAlpha: number): string {
     radial-gradient(ellipse ${c}px 26% at 100% 50%, rgba(255, 255, 255, ${a * 0.9}), transparent 100%)`
 }
 
-/**
- * 定向玻璃边光（commit 版配方，适配黑玻璃）：光从左上来、往右下衰减到几乎为零。
- * 四边都有光但强度一路递减，因此玻璃形状被读出来，却没有任何一段是均匀等亮的 ⇒ 不会成描边。
- */
+
 function composerEdgeWash(alpha: number): string {
   return `inset 1px 1px 2px rgba(255, 255, 255, ${alpha}),
     inset 3px 2px 9px -5px rgba(255, 255, 255, ${alpha * 0.9}),
@@ -103,7 +90,7 @@ function composerEdgeWash(alpha: number): string {
     inset 0 -2px 9px -6px rgba(255, 255, 255, ${alpha * 0.18})`
 }
 
-/** 输入框：暗色玻璃材质 + 对称边缘光 + 悬浮投影（纯 CSS）。 */
+
 function composerMaterial(): string {
   return `${darkGlassFilm()}
   background-image: ${composerEdgeLight(COMPOSER_CORE_ALPHA)};
@@ -120,18 +107,14 @@ function composerMaterial(): string {
 
 const OBJECT_FIT_LIGHT = viewportLight('0 0', '100% 100%')
 
-/** 座位底部「地面重画带」高度：48px（0.2.1 最终形态的取值：盖住卡片下沿圆角 / 统计行，不遮悬浮阴影）。 */
+
 export const SEAT_BAND_PX = 48
-/** 官方 composerStack 的堆栈缝（读官方参数，回落当前官方值）。 */
+
 const STACK_GAP = 'var(--dsh-composer-stack-gap, 6px)'
-/** 停靠卡（todo / goal / queue）的官方锚点；没有类名可依赖，只用语义 data 属性。 */
+
 const DOCK_CARDS = `:is([data-testid='todo-panel'], [data-queue-dock], [data-goal-bar])`
 
-/**
- * 座位内「地面原地重画」（0.2.1 最终形态）：与地面层同一张视口渐变（含 1 LSB 抖动层）。
- * `background-attachment: fixed` 让定位区 = 视口 ⇒ 与 `.dsh-theme-tone` 地面层逐像素同源；
- * 前提是 backdrop.ts 把 0.2.2 座位新增的 `will-change` 覆盖成 `auto`（0.2.1 的座位没有这条合成提示）。
- */
+
 function groundRepaint(): string {
   return `  background-color: var(--dsw-alias-bg-base);
   background-image: ${BACKDROP_GRADIENTS}, ${DITHER_TILE};
@@ -141,7 +124,7 @@ function groundRepaint(): string {
 }
 
 const RP = `[${RIGHT_PANEL_ATTR}][data-sidebar-right-open] [data-dockkit-pane]`
-/** 各标签自己的 38px 头行（玻璃面挂在它们的 ::before 上，向上铺满 0..76）。 */
+
 const PANEL_HEADERS = [
   `${P} ${RP} [data-files-page] > *:first-child`,
   `${P} ${RP} [data-textpreview-state='unsupported'] > *:first-child`,
@@ -150,18 +133,13 @@ const PANEL_HEADERS = [
   `${P} ${RP} [data-textpreview-state='text'] > [data-textpreview-meta-failed] + *`,
 ].join(',\n')
 
-/**
- * 右栏 76px 下有「可流式滚动的正文」的标签：正文上提 76px，从两条带下滚过（磨砂玻璃才真的在糊东西，
- * 与对话区顶栏同观感）。0.2.2 的文件页正文在常驻目录树 aside 里；预览里的目录树也带
- * `[data-files-body]`，所以文件树选择器必须限定在文件页根 `[data-files-page]` 之下。
- * `:has([data-code-preview])` 的预览体官方改成不滚动，排除掉避免内容被抬错位置。
- */
+
 const LIFTED_SCROLLS = [
   `${P} ${RP} [data-files-page] [data-files-body]`,
   `${P} ${RP} [data-textpreview-state='text'] [data-textpreview-body]:not(:has([data-code-preview]))`,
   `${P} ${RP} [data-textpreview-state='unsupported'] [data-textpreview-body]`,
 ].join(',\n')
-/** 滚动条轨道规则要把伪元素加在每条选择器上（整串逗号列表末尾追加只命中最后一条）。 */
+
 const LIFTED_TRACKS = LIFTED_SCROLLS.split(',\n').map(selector => `${selector}::-webkit-scrollbar-track`).join(',\n')
 
 export function buildGlassCss(): string {

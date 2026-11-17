@@ -1,26 +1,23 @@
-/** dsh-codebuddy-credits 客户端纯逻辑：只读模型清单与积分的展示格式化。 */
 
-/** 整数不挂小数位，非整数保留两位；各处展示共用这一个口径。 */
+
+
 export function formatCredits(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2)
 }
 
-/** 容量 → 短串：≥1M 用 M（至多一位小数）、≥1K 用 K；非法值返回 undefined（渲染侧按缺省处理）。 */
+
 export function formatCapacity(value: unknown): string | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return undefined
   if (value >= 1_000_000) return `${Math.round(value / 100_000) / 10}M`
   if (value >= 1_000) {
-    // 999_500+ 四舍五入到 1000K 时收成 1M，避免出现「1000K」这种边界串。
+
     const thousands = Math.round(value / 1_000)
     return thousands >= 1_000 ? `${Math.round(value / 100_000) / 10}M` : `${thousands}K`
   }
   return String(Math.round(value))
 }
 
-/**
- * 模型右侧事实串 `x0.00 · 1M`：系数原样透传（零系数就是 `x0.00`，不映射 free）；
- * 两者都缺省返回 undefined——渲染侧只显示模型名，不显示占位符。
- */
+
 export function formatModelFacts(
   model: { credits?: string; contextWindow?: number } | undefined,
 ): string | undefined {

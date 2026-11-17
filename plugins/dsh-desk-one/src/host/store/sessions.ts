@@ -1,4 +1,4 @@
-/** Session-index repository: host session headers projected into the unified node table. */
+
 
 import { SESSION_INDEX_MISSING_DAYS } from '../../constants.js'
 import { createSessionIndexRecord, sessionIndexId, type SessionIndexDraft } from '../sessions/records.js'
@@ -8,7 +8,7 @@ import type { StoreCore } from './core.js'
 export class SessionIndexRepository {
   constructor(private readonly core: StoreCore) {}
 
-  /** Session index: refresh from host headers; never copies session content. */
+
   async upsertSessionIndexes(drafts: readonly SessionIndexDraft[]): Promise<{ indexed: number; missing: number }> {
     const now = new Date().toISOString()
     const seen = new Set<string>()

@@ -1,8 +1,4 @@
-/**
- * CodeBuddy 模型目录解析：不预置模型，列表随用户 Key 走——保存 Key 后（及宿主重建目录时）
- * 才调 /v3/config，事实只存进程内、不落设置节，无 Key 时零网络请求；展示名一律用服务端
- * 原始模型名，credits / supportsImages / reasoning 档位声明直接转成模型事实。
- */
+
 
 import { randomUUID } from 'node:crypto'
 import { LlmError } from '@deepseek-ai/dsh-llm'
@@ -17,32 +13,32 @@ import {
   REQUEST_USER_AGENT,
 } from './constants.js'
 
-/** 思考档位声明：false 禁用；dict 显式声明（key 为档位 id，value 为 wire 拼写，null 表示不发参数）。 */
+
 export type ReasoningEfforts = false | Record<string, string | null>
 
-/** 完整解析的远端模型条目（比 DSH 的 LlmDiscoveredModel 多计费、多模态与档位事实）。 */
+
 export interface CodeBuddyModelEntry {
   id: string
-  /** 服务端原始模型名（不含任何插件附加标记）。 */
+
   name: string
-  /** 积分消耗系数短串（"x0.79"），缺省表示服务端未声明。 */
+
   credits?: string
   contextWindow?: number
   maxTokens?: number
   input?: ('text' | 'image')[]
   reasoningEfforts?: ReasoningEfforts
-  /** 服务端声明的默认思考档位（fixed-effort 形态取 effort 值本身）。 */
+
   defaultEffort?: string
-  /** 服务端模型描述（descriptionZh ?? descriptionEn），缺省表示未声明。 */
+
   description?: string
 }
 
-/** 解析后的模型事实（adapter 与状态接口共用）。 */
+
 export interface CodeBuddyModelFacts {
   id: string
-  /** 服务端原始模型名（不含任何插件附加标记）。 */
+
   name: string
-  /** 积分系数短串（"x0.79"），服务端未声明时缺省——额度卡与选择器的只读事实行用。 */
+
   credits?: string
   contextWindow: number
   maxTokens: number
@@ -53,12 +49,7 @@ export interface CodeBuddyModelFacts {
   description?: string
 }
 
-/**
- * 思考档位的规范次序：官方 `LlmModelReasoningInfo.efforts` 要求「from least to greatest」
- * （上游 `packages/llm/llm/src/types.ts:399`），且官方 `session-title-first-prompt-llm` 取
- * `efforts[0]` 当最低档（上游 `packages/session/session-title-first-prompt-llm/src/index.ts:76`）。
- * 服务端 `supportedEfforts` 不保证升序，故这里以 rank 归一化。
- */
+
 const EFFORT_RANK: Readonly<Record<string, number>> = {
   off: 0,
   minimal: 1,
@@ -69,10 +60,10 @@ const EFFORT_RANK: Readonly<Record<string, number>> = {
   max: 6,
 }
 
-/** 未知档位 id 的 rank：排在全部已知档位之后（稳定排序保留服务端相对次序）。 */
+
 const UNKNOWN_EFFORT_RANK = Number.MAX_SAFE_INTEGER
 
-/** 按官方 rank 升序排列档位 id；同 rank（含未知档位）保持原有相对次序。 */
+
 function sortEfforts(levels: readonly string[]): string[] {
   return levels
     .map((level, index) => ({ level, index }))
@@ -82,7 +73,7 @@ function sortEfforts(levels: readonly string[]): string[] {
     .map(entry => entry.level)
 }
 
-/** 思考档位 id → 展示名（选择器推理等级面板用；未知 id 原样）。 */
+
 export function effortName(id: string): string {
   switch (id) {
     case 'off': return 'Off'
@@ -96,12 +87,12 @@ export function effortName(id: string): string {
   }
 }
 
-/** 完整条目 → 模型事实（推理三态：false/dict/缺省；未声明容量用兜底常量）。 */
+
 export function factsFromEntries(entries: readonly CodeBuddyModelEntry[]): CodeBuddyModelFacts[] {
   return entries.map(entry => {
     const declared = entry.reasoningEfforts
     const reasoning = declared !== undefined && declared !== false
-    // off 是否可用由 declaredEfforts 依据 canDisableThinking 决定，这里只透传（别无条件塞 off）。
+
     const thinkingLevelMap = declared !== undefined && declared !== false
       ? { ...declared }
       : undefined
@@ -120,7 +111,7 @@ export function factsFromEntries(entries: readonly CodeBuddyModelEntry[]): CodeB
   })
 }
 
-/** 请求头：本插件身份标识 + 企业上下文（企业字段来自 /v2/accounts）；目录 / 账号 / 配额端点共用此出口。 */
+
 export function requestHeaders(
   apiKey: string,
   account?: { userId?: string; enterpriseId?: string },
@@ -130,7 +121,7 @@ export function requestHeaders(
     'x-api-key': apiKey,
     'user-agent': REQUEST_USER_AGENT,
     'x-product': PRODUCT_HEADER,
-    // 企业用量后台按该头归属 client，也只认它：如实上报身份，使后台能区分我们与官方 IDE/CLI 的消耗。
+
     'x-ide-name': CLIENT_NAME,
     ...(account?.enterpriseId === undefined ? {} : {
       'x-enterprise-id': account.enterpriseId,
@@ -140,11 +131,7 @@ export function requestHeaders(
   }
 }
 
-/**
- * 官方桌面端的会话身份三件套：chat 端点必须带，缺任一即 400 / 11128
- * （`displayTips` 写成「渠道校验」，实际报的是缺会话 id）。三个值每次请求新生成、互不相同；
- * 模型目录 / 账号 / 配额端点不带（与官方客户端一致）。
- */
+
 export function conversationHeaders(): Record<string, string> {
   return {
     'x-conversation-id': randomUUID(),
@@ -153,7 +140,7 @@ export function conversationHeaders(): Record<string, string> {
   }
 }
 
-/** chat 端点专用请求头：通用身份 + 会话三件套。 */
+
 export function chatHeaders(
   apiKey: string,
   account?: { userId?: string; enterpriseId?: string },
@@ -175,20 +162,20 @@ function text(...values: readonly unknown[]): string | undefined {
   return undefined
 }
 
-/** 服务端系数原串（"x0.79 credits"）→ 短系数 "x0.79"。 */
+
 function shortCredits(raw: unknown): string | undefined {
   if (typeof raw !== 'string') return undefined
   const match = /x[\d.]+/i.exec(raw)
   return match?.[0]
 }
 
-/** reasoning 两种形态：可选档位（supportedEfforts + canDisableThinking，可关思考）与固定档位（仅 effort 单串，只有一档、不可关）。 */
+
 function declaredEfforts(raw: Record<string, unknown>): ReasoningEfforts {
   const supported = Array.isArray(raw.supportedEfforts) ? raw.supportedEfforts as unknown[] : undefined
   if (supported !== undefined && supported.length > 0) {
     const levels = supported.filter((level): level is string => typeof level === 'string' && level.length > 0)
-    // map 的键序即 thinkingLevelMap 的声明序（Object.keys → 官方 efforts 数组），故 off 在最前、
-    // 其余按 rank 升序；服务端乱序也在这里归一化。
+
+
     const map: Record<string, string | null> = {}
     if (raw.canDisableThinking !== false) map.off = null
     for (const level of sortEfforts(levels)) {
@@ -202,7 +189,7 @@ function declaredEfforts(raw: Record<string, unknown>): ReasoningEfforts {
   return { off: null }
 }
 
-/** 服务端声明的默认档位（可选档位形态取 defaultEffort，固定档位形态取 effort）。 */
+
 function declaredDefaultEffort(raw: Record<string, unknown>): string | undefined {
   const declared = raw.defaultEffort
   if (typeof declared === 'string' && declared.length > 0) return declared
@@ -210,12 +197,12 @@ function declaredDefaultEffort(raw: Record<string, unknown>): string | undefined
   return typeof fixed === 'string' && fixed.length > 0 ? fixed : undefined
 }
 
-/** 视觉判定以 /v3/config 的 supportsImages 为准；disabledMultimodal 只是冗余标注，不改变结论。 */
+
 function supportsNativeVision(raw: Record<string, unknown>): boolean {
   return raw.supportsImages === true
 }
 
-/** /v3/config 响应 → 完整模型条目（纯函数，供单测）：允许列表取 data.agents 里 name === 'cli' 的 models，详情在 data.models。 */
+
 export function parseModelConfig(body: unknown): readonly CodeBuddyModelEntry[] {
   const data = (body as { data?: unknown })?.data as Record<string, unknown> | undefined
   const agents = Array.isArray(data?.agents) ? data.agents as Array<Record<string, unknown>> : (data?.agent as { agents?: unknown })?.agents as Array<Record<string, unknown>> | undefined
@@ -256,7 +243,7 @@ export function parseModelConfig(body: unknown): readonly CodeBuddyModelEntry[] 
   })
 }
 
-/** 完整条目 → DSH 发现结果（官方「获取可用模型」契约的四字段，name 为服务端原始模型名）。 */
+
 export function toDiscovered(entries: readonly CodeBuddyModelEntry[]): LlmDiscoveredModel[] {
   return entries.map(entry => ({
     id: entry.id,
@@ -266,7 +253,7 @@ export function toDiscovered(entries: readonly CodeBuddyModelEntry[]): LlmDiscov
   }))
 }
 
-/** 拉取并解析 CodeBuddy 模型目录（只在用户给 Key 后调用），带超时。 */
+
 export async function fetchCodeBuddyModels(
   apiKey: string,
   account?: { userId?: string; enterpriseId?: string },
@@ -296,7 +283,7 @@ export async function fetchCodeBuddyModels(
   return models
 }
 
-/** DSH 模型发现契约入口（四字段）。 */
+
 export async function discoverCodeBuddyModels(
   apiKey: string,
   account?: { userId?: string; enterpriseId?: string },

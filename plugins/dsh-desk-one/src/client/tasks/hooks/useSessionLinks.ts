@@ -1,4 +1,4 @@
-/** Subscribe the board to the session-link facade (live titles / running state / availability). */
+
 
 import { useEffect, useState } from 'react'
 import type { SessionLinkApi, SessionLinkSnapshot } from '../../sessions/contract.js'

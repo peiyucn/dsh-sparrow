@@ -1,4 +1,4 @@
-/** Microsoft personal account: Graph OAuth (browser redirect + PKCE, device code fallback). */
+
 
 import { CalendarRows } from './provider-card.js'
 import { MicrosoftLogo, ProviderLogo } from './logos.js'
@@ -10,7 +10,7 @@ import type { DeskTranslator } from '../../app/types.js'
 import type { ReactElement } from 'react'
 import type { ScheduleApi } from '../api.js'
 
-/** Poll interval while one OAuth flow is pending (ms). */
+
 const LOGIN_POLL_INTERVAL_MS = 5_000
 
 export function OutlookGraphCard(props: {
@@ -30,7 +30,7 @@ export function OutlookGraphCard(props: {
   const popupRef = useRef<Window | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  /** Latest refresh callback, so re-renders of the parent cannot restart the poll timer. */
+
   const onChangedRef = useRef(props.onChanged)
   onChangedRef.current = props.onChanged
 
@@ -47,8 +47,8 @@ export function OutlookGraphCard(props: {
           setError(reason instanceof Error ? reason.message : String(reason))
           return
         }
-        // The host forgot this flow: polling can never recover, so return to the login buttons
-        // instead of ticking against a dead flow id forever.
+
+
         popupRef.current?.close()
         popupRef.current = null
         setFlow(null)
@@ -56,7 +56,7 @@ export function OutlookGraphCard(props: {
         return
       }
       if (stopped) return
-      // A transient failure earlier is over once the host answers again.
+
       setError(null)
       if (result.status !== 'connected') return
       popupRef.current?.close()
@@ -77,7 +77,7 @@ export function OutlookGraphCard(props: {
     const popup = device ? null : window.open('', 'desk-one-outlook', 'width=520,height=680')
     popupRef.current = popup
     try {
-      // Microsoft ignores the port for localhost redirect URIs, so the DSH port can vary.
+
       const port = window.location.port === '' ? '' : `:${window.location.port}`
       const redirectUri = device ? undefined : `http://localhost${port}/api/desk-one/schedule/outlook/callback`
       const start = await api.startOutlookLogin(redirectUri)

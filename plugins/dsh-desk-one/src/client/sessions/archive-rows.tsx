@@ -1,7 +1,4 @@
-/**
- * Archive tree rows: one archived session subtree (with its two-step actions) plus the read-only
- * subagent rows shown inside a trash entry.
- */
+
 
 import type { ReactElement } from 'react'
 import { fileSizeText } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -16,11 +13,11 @@ export function countTree(nodes: readonly ArchiveTreeNode[]): number {
   return nodes.reduce((sum, node) => sum + 1 + countTree(node.children), 0)
 }
 
-/** One archived subtree: shared tree row + archive-only actions/confirmation; children recurse. */
+
 export function ArchiveTreeNodeRow(props: {
   readonly node: ArchiveTreeNode
   readonly depth: number
-  /** Subagent rows are read-only: every operation is parent-scoped, same as the retired archive plugin. */
+
   readonly readOnly: boolean
   readonly t: DeskTranslator
   readonly expanded: Set<string>
@@ -132,7 +129,7 @@ export function ArchiveTreeNodeRow(props: {
     </li>
   )
 }
-/** Trash subagents keep their parent-child display; actions stay on the parent entry. */
+
 export function TrashSubagentRows(props: {
   readonly t: DeskTranslator
   readonly parentId: string

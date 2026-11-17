@@ -1,10 +1,4 @@
-/**
- * Board state on top of tasks + first-class groups.
- *
- * A lane is ONE manual sequence of blocks: ungrouped cards and group blocks share the same
- * `order` coordinate. Legacy boards kept two separate order spaces; until the first structural
- * drag renumbers a lane, the view falls back to "cards first, then groups" (see manualBlocks).
- */
+
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
@@ -57,7 +51,7 @@ export interface TaskBoardApi {
   readonly beginDraft: (status: TaskStatus, groupId?: string) => void
   readonly cancelDraft: () => void
   readonly commitDraft: (title: string) => void
-  /** `toIndex` is a card index when `toGroupId` is set, otherwise a lane block index. */
+
   readonly moveTask: (taskId: string, toStatus: TaskStatus, toGroupId: string | undefined, toIndex: number) => void
   readonly archiveTask: (task: DeskTask) => void
   readonly restoreTask: (task: DeskTask) => void
@@ -67,9 +61,9 @@ export interface TaskBoardApi {
   readonly createGroup: (status: TaskStatus, name: string) => Promise<DeskTaskGroup | null>
   readonly renameGroup: (group: DeskTaskGroup, name: string) => void
   readonly removeGroup: (group: DeskTaskGroup) => void
-  /** Move a whole group block to a block index in a lane (host cascades its cards cross-lane). */
+
   readonly moveGroupBlock: (group: DeskTaskGroup, status: TaskStatus, toIndex: number) => void
-  /** Archive / restore a group and update its cards' archived flag from the host result. */
+
   readonly archiveGroup: (group: DeskTaskGroup, archived: boolean) => Promise<GroupMoveResult | null>
   readonly archivedGroups: readonly DeskTaskGroup[]
 }
@@ -79,7 +73,7 @@ function readSortMode(): TaskSortMode {
     const stored = window.localStorage.getItem(TASK_SORT_STORAGE_KEY)
     if (stored === 'manual' || stored === 'created' || stored === 'due') return stored
   } catch {
-    // Storage unavailable: keep the default manual order.
+
   }
   return 'manual'
 }
@@ -101,7 +95,7 @@ function persist(key: string, value: unknown): void {
   try {
     window.localStorage.setItem(key, JSON.stringify(value))
   } catch {
-    // Pure UI preference: losing it is acceptable.
+
   }
 }
 
@@ -114,12 +108,12 @@ export function useTaskBoard({
   const [draft, setDraft] = useState<TaskDraft | null>(null)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(readCollapsed)
 
-  // Group metadata now lives on the host; drop the pre-refactor localStorage leftovers once.
+
   useEffect(() => {
     try {
       window.localStorage.removeItem(TASK_GROUPS_STORAGE_KEY)
     } catch {
-      // Nothing to migrate when storage is unavailable.
+
     }
   }, [])
 
@@ -132,7 +126,7 @@ export function useTaskBoard({
   const blocksFor = useCallback((status: TaskStatus): LaneBlock[] =>
     manualBlocks(tasks, activeGroups, status), [activeGroups, tasks])
 
-  /** One optimistic task patch path for reorder / renumber / move operations. */
+
   const applyTaskPatches = useCallback((entries: readonly { source: DeskTask; patch: TaskPatchRequest }[]): void => {
     if (entries.length === 0) return
     const byId = new Map(entries.map(entry => [entry.source.id, entry.patch]))
@@ -144,7 +138,7 @@ export function useTaskBoard({
     setActionError(null)
   }, [savePatch, setActionError, setTasks])
 
-  /** Persist a lane's block sequence: ungrouped cards and groups share the block index. */
+
   const applyBlockOrders = useCallback((
     blocks: readonly LaneBlock[],
     moving?: { readonly task: DeskTask; readonly patch: TaskPatchRequest },
@@ -184,7 +178,7 @@ export function useTaskBoard({
     const trimmed = title.trim()
     if (trimmed === '') return
     if (target.groupId === undefined) {
-      // New ungrouped card becomes the last block of the lane.
+
       void addTask({ title: trimmed, status: target.status, order: blocksFor(target.status).length })
       return
     }
@@ -227,14 +221,14 @@ export function useTaskBoard({
   }, [blocksFor, createGroup])
 
   const removeGroupAction = useCallback((group: DeskTaskGroup): void => {
-    // Cards keep existing; only their membership is cleared.
+
     setTasks(current => current.map(task => task.groupId === group.id
       ? { ...task, groupId: undefined }
       : task))
     removeGroup(group)
   }, [removeGroup, setTasks])
 
-  /** Move one card into a group's card list, or into the lane's block sequence. */
+
   const moveTask = useCallback((
     taskId: string,
     toStatus: TaskStatus,
@@ -266,7 +260,7 @@ export function useTaskBoard({
       return
     }
 
-    // Ungrouped target: insert a card block into the shared lane sequence.
+
     const blocks = blocksFor(toStatus)
       .filter(block => !(block.kind === 'task' && block.task.id === taskId))
     const index = Math.max(0, Math.min(toIndex, blocks.length))
@@ -280,7 +274,7 @@ export function useTaskBoard({
     })
   }, [applyBlockOrders, blocksFor, tasks])
 
-  /** Move a group block within the unified lane sequence (same lane) or across lanes. */
+
   const moveGroupBlock = useCallback((group: DeskTaskGroup, status: TaskStatus, toIndex: number): void => {
     if (status === group.status) {
       const blocks = blocksFor(status)
@@ -313,7 +307,7 @@ export function useTaskBoard({
       })
       applyBlockOrders(targetBlocks)
 
-      // Close the gap the moved group left in its old lane.
+
       applyBlockOrders(manualBlocks(updatedTasks, updatedGroups, group.status))
     })()
   }, [applyBlockOrders, blocksFor, moveGroupToLane, setTasks, tasks])

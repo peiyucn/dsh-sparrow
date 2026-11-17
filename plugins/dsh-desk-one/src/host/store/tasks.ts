@@ -1,4 +1,4 @@
-/** Task repository: the board's cards plus the lane/group membership invariants. */
+
 
 import { randomUUID } from 'node:crypto'
 import {
@@ -8,7 +8,7 @@ import type { DeskTask } from '../../contract.js'
 import type { GroupRepository } from './groups.js'
 import type { StoreCore } from './core.js'
 
-/** Creation input accepted by `createTask` (unknown fields are validated by the model). */
+
 export interface CreateTaskInput {
   readonly title?: unknown
   readonly body?: unknown
@@ -24,7 +24,7 @@ export interface CreateTaskInput {
 export class TaskRepository {
   constructor(private readonly core: StoreCore, private readonly groups: GroupRepository) {}
 
-  /** List tasks in board order; callers pass a limit on the tool surface. */
+
   listTasks(query?: string, limit?: number): DeskTask[] {
     const tasks = this.core.allNodes().filter((node): node is DeskTask => node.kind === 'task')
     const filtered = filterTasks(sortTasks(tasks), query)
@@ -33,7 +33,7 @@ export class TaskRepository {
     return bounded === 0 ? filtered : filtered.slice(0, bounded)
   }
 
-  /** Create a task; titles are required and validated in the model. */
+
   async createTask(raw: CreateTaskInput): Promise<DeskTask> {
     const input = normalizeTaskInput(raw)
     if (input.groupId !== undefined) {
@@ -49,10 +49,7 @@ export class TaskRepository {
     return task
   }
 
-  /**
-   * Membership invariant: a task may only belong to a group in its own lane. A cross-lane status
-   * move that leaves `groupId` untouched clears the membership (the group stays in its lane).
-   */
+
   private reconcileTaskGroup(task: DeskTask, patch: TaskPatch): DeskTask {
     if (task.groupId === undefined) return task
     const group = this.groups.groupById(task.groupId)
@@ -68,15 +65,15 @@ export class TaskRepository {
     throw new DeskModelError('INVALID_GROUP', '任务状态与所属分组的泳道不一致')
   }
 
-  /** Patch one task; revision mismatch -> REVISION_CONFLICT, missing -> UNKNOWN_TASK. */
+
   async updateTask(id: string, expectedRevision: number, patch: TaskPatch): Promise<DeskTask> {
     const now = new Date().toISOString()
     try {
       const updated = await this.core.nodes.update(id, (current) => {
         if (current.kind !== 'task') throw new DeskModelError('UNKNOWN_TASK', `任务不存在：${id}`)
         const next = patchTaskRecord(current, patch, { expectedRevision, now })
-        // The board only archives Done cards; keep that invariant on the host surface too, because
-        // the agent tool and REST routes can bypass the Done-lane-only UI action.
+
+
         if (next.archived && next.status !== 'done') {
           throw new DeskModelError('INVALID_TASK', '只有完成列的任务才能存档')
         }
@@ -89,7 +86,7 @@ export class TaskRepository {
     }
   }
 
-  /** Delete one task permanently. */
+
   async deleteTask(id: string): Promise<boolean> {
     const current = this.core.nodes.get(id)
     if (current === undefined || current.kind !== 'task') {

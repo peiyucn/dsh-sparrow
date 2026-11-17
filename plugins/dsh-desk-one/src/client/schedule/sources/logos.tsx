@@ -1,4 +1,4 @@
-/** Provider marks kept inline so the plugin ships no icon dependency. */
+
 
 import type { ReactElement } from 'react'
 import type { ScheduleProvider } from '../../../constants.js'
@@ -14,7 +14,7 @@ export function MicrosoftLogo(): ReactElement {
   )
 }
 
-/** Provider marks: Apple / Microsoft / Tencent, kept inline so no icon dependency ships. */
+
 function AppleLogo(): ReactElement {
   return (
     <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="currentColor">
@@ -36,4 +36,3 @@ export function ProviderLogo(props: { readonly provider: ScheduleProvider }): Re
   if (props.provider === 'icloud') return <AppleLogo />
   return <TencentLogo />
 }
-

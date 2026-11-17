@@ -1,10 +1,4 @@
-/**
- * Locale dictionaries for this plugin (zh / en), assembled from the per-feature fragments under
- * `./i18n/`. This file is the single source of truth for typed keys: `DeskLocaleKey` derives from
- * the zh dictionary, and `locale.d.ts` derives the typed namespace from that union — adding a key
- * is a one-file change. The zh / en key sets must correspond one-to-one (guarded by
- * test/structure/i18n.test.mjs).
- */
+
 import { en as appEn, zh as appZh } from './i18n/app.js'
 import { en as notebookEn, zh as notebookZh } from './i18n/notebook.js'
 import { en as reviewEn, zh as reviewZh } from './i18n/review.js'
@@ -36,8 +30,8 @@ const EN = {
   ...sessionsEn,
 } as const
 
-/** Every dictionary key; the typed locale namespace in `locale.d.ts` derives from this union. */
+
 export type DeskLocaleKey = keyof typeof ZH
 
-/** zh / en dictionaries, registered under LOCALE_NAMESPACE by the client entry. */
+
 export const LOCALE_DICTS = { zh: ZH, en: EN } as const

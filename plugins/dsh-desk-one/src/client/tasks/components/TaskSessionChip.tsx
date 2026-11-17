@@ -1,10 +1,4 @@
-/**
- * One linked-session chip on a task card, plus its in-place stats expansion.
- *
- * The chip is one interactive surface: clicking anywhere toggles the expansion; the remove and
- * enter controls stop propagation. Stats inherit the chip's neutral text color and its
- * running/idle tint, so the expanded box reads as the chip growing rather than a popup.
- */
+
 
 import type { ReactElement } from 'react'
 import { ActionTooltip } from '../../app/ActionTooltip.js'
@@ -22,7 +16,7 @@ interface TaskSessionChipProps {
   readonly onUnlink: () => void
 }
 
-/** Human status label shared with the picker. */
+
 export function sessionStatusText(t: DeskTranslator, chip: SessionChipInfo): string {
   if (chip.availability === 'available') return chip.running ? t('task.session.running') : t('task.session.idle')
   if (chip.availability === 'loading') return t('task.session.loading')
@@ -30,7 +24,7 @@ export function sessionStatusText(t: DeskTranslator, chip: SessionChipInfo): str
   return t('task.session.unavailable')
 }
 
-/** Localize the shared age bucket of the session's last run. */
+
 function lastRunText(t: DeskTranslator, chip: SessionChipInfo): string {
   const age = relativeTimeOf(chip.updatedAt)
   switch (age.unit) {
@@ -42,7 +36,7 @@ function lastRunText(t: DeskTranslator, chip: SessionChipInfo): string {
   }
 }
 
-/** Total provider-reported tokens (input + output + cache read/write). */
+
 function tokenTotalOf(chip: SessionChipInfo): { readonly known: boolean; readonly total: number } {
   const values = [chip.inputTokens, chip.outputTokens, chip.cacheReadTokens, chip.cacheWriteTokens]
     .filter((value): value is number => typeof value === 'number')

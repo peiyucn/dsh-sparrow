@@ -1,14 +1,8 @@
-/**
- * Domain types for the schedule module (read-only aggregation of external calendars).
- *
- * Kept dependency-free so the adapters, the store mapping and the tests all agree on one
- * vocabulary. Only {@link ScheduleError} has behavior: every adapter must classify failures the
- * same way (auth vs transient vs unsupported) for the UI to offer the right next action.
- */
+
 
 type CalendarProvider = 'wecom' | 'icloud' | 'outlook' | 'ics'
 
-/** One remote calendar. `order` preserves the server-side order for the source → calendar tree. */
+
 export interface RemoteCalendar {
   provider: CalendarProvider
   remoteId: string
@@ -16,11 +10,11 @@ export interface RemoteCalendar {
   order: number
 }
 
-/** One event instance, already expanded (recurrence) and normalised to UTC. */
+
 export interface RemoteEvent {
   provider: CalendarProvider
   calendarRemoteId: string
-  /** Remote identity: `UID` for single events, `UID#RECURRENCE-ID` for expanded instances. */
+
   externalId: string
   uid: string
   recurrenceId?: string
@@ -32,25 +26,20 @@ export interface RemoteEvent {
   startUtc: string
   endUtc: string
   allDay: boolean
-  /** IANA name when the VTIMEZONE declared one; the literal TZID otherwise; `UTC` when unknown. */
+
   timezone: string
   busy: boolean
   url?: string
   rrule?: string
 }
 
-/** Half-open time window `[startUtc, endUtc)` used for pulling and expanding recurrences. */
+
 export interface PullWindow {
   startUtc: string
   endUtc: string
 }
 
-/**
- * Failure classes shared by every source:
- * - `AUTH_EXPIRED` needs a new password / re-published ICS link, never an automatic retry.
- * - `TRANSIENT` is a network / 5xx / rate-limit failure and may be retried with backoff.
- * - `UNSUPPORTED` means the server answered with something this adapter cannot map.
- */
+
 type SyncErrorKind = 'AUTH_EXPIRED' | 'TRANSIENT' | 'UNSUPPORTED'
 
 export class ScheduleError extends Error {
@@ -59,15 +48,12 @@ export class ScheduleError extends Error {
     this.name = 'ScheduleError'
   }
 
-  /**
-   * HTTP mapping: auth expiry asks for a credential re-entry (409); transient / unsupported are
-   * 503 so the client can retry or ask the user to configure a source.
-   */
+
   get status(): number {
     return this.kind === 'AUTH_EXPIRED' ? 409 : 503
   }
 
-  /** Stable wire code; an explicit construction value (e.g. `SCHEDULE_TRANSIENT`) wins. */
+
   get code(): string {
     return this.explicitCode ?? (this.kind === 'AUTH_EXPIRED' ? 'SCHEDULE_AUTH_EXPIRED' : 'SCHEDULE_UNAVAILABLE')
   }

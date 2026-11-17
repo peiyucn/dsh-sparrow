@@ -1,4 +1,4 @@
-/** Note REST routes: handlers only; mounting and the trust fence live in host/router.ts. */
+
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { MAX_QUERY_CHARS, ROUTES } from '../../constants.js'

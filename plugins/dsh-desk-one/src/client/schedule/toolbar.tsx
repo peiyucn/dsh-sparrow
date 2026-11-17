@@ -1,4 +1,4 @@
-/** Schedule toolbar: range navigation, view switch and last-sync stamp. */
+
 
 import { addDays, formatClock24h, formatDateLabel, formatFullDateLabel, formatMonthLabel, startOfLocalDay } from './utils.js'
 import { ActionTooltip } from '../app/ActionTooltip.js'
@@ -6,7 +6,7 @@ import type { DeskTranslator } from '../app/types.js'
 import type { ReactElement } from 'react'
 import type { ScheduleViewName } from './utils.js'
 
-/* --------------------------------- toolbar ---------------------------------- */
+
 
 interface ToolbarProps {
   readonly t: DeskTranslator
@@ -68,4 +68,3 @@ export function ScheduleToolbar(props: ToolbarProps): ReactElement {
     </div>
   )
 }
-

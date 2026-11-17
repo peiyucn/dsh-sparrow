@@ -1,4 +1,4 @@
-/** Task archive sub-page: archived groups first, then archived cards, each with restore and delete. */
+
 
 import { useState } from 'react'
 import type { ReactElement } from 'react'
@@ -19,7 +19,7 @@ interface TaskArchiveViewProps {
   readonly onDeleteTask: (id: string) => void
 }
 
-/** Two-step delete row for an archived group (deleting it also deletes its cards). */
+
 function GroupArchiveRow({
   group, countLabel, t, onRestore, onDelete,
 }: {
@@ -72,7 +72,7 @@ function GroupArchiveRow({
   )
 }
 
-/** Two-step delete row for the archive list (same pattern as the cards). */
+
 function ArchiveRow({
   task, t, onRestore, onDelete,
 }: {
@@ -119,7 +119,7 @@ function ArchiveRow({
   )
 }
 
-/** Archive tab: one row per archived group first, then per archived card. */
+
 export function TaskArchiveView({
   tasks, groups, t, countText, onRestoreGroup, onDeleteGroup, onRestoreTask, onDeleteTask,
 }: TaskArchiveViewProps): ReactElement {

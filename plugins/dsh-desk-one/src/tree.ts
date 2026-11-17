@@ -1,8 +1,4 @@
-/**
- * Generic parent/child nesting shared by the session catalog (client snapshot) and the archive
- * tree (host projection). One implementation means both lists agree on lineage, orphan promotion
- * and cycle handling instead of maintaining two subtly different builders.
- */
+
 
 interface TreeNode<T> {
   readonly value: T
@@ -11,17 +7,13 @@ interface TreeNode<T> {
 
 interface NestOptions<T> {
   readonly idOf: (item: T) => string
-  /** Parent id; return undefined for roots (e.g. non-subagent sessions). */
+
   readonly parentIdOf: (item: T) => string | undefined
   readonly sortRoots?: (left: T, right: T) => number
   readonly sortChildren?: (left: T, right: T) => number
 }
 
-/**
- * Nest items by parent id. A child whose parent is absent stays a root (orphan promotion), and a
- * parent cycle is broken by promoting the first node of the cycle to a root — deterministic and
- * never an infinite recursion.
- */
+
 export function nestTree<T>(items: readonly T[], options: NestOptions<T>): TreeNode<T>[] {
   const byId = new Map<string, T>()
   for (const item of items) byId.set(options.idOf(item), item)
@@ -43,7 +35,7 @@ export function nestTree<T>(items: readonly T[], options: NestOptions<T>): TreeN
       childrenOf.set(parentId, siblings)
     }
   }
-  // Promote one node per cycle so malformed lineage cannot hang the builder.
+
   for (const item of items) {
     let cursor = options.idOf(item)
     const seen = new Set<string>()

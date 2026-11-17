@@ -1,11 +1,8 @@
-/**
- * 设置行的样式表（纯 CSS 文本，由 client half 注入）。视觉语言对齐官方外观行，但用本插件自己的类名前缀 ——
- * 不复刻官方 hashed 类名、不依赖官方 DOM 结构。
- */
+
 
 import { BACKDROP_CLASS } from '../constants.js'
 
-/** 行的类名（对外导出给组件用，避免两处各写一遍字符串）。 */
+
 export const ROW_CLASS = Object.freeze({
   group: `${BACKDROP_CLASS}-group`,
   title: `${BACKDROP_CLASS}-title`,
@@ -14,7 +11,7 @@ export const ROW_CLASS = Object.freeze({
   selected: `${BACKDROP_CLASS}-cube-selected`,
 })
 
-/** 设置行的样式表文本（注入 `<style>`）。 */
+
 export function buildRowCss(): string {
   const { group, title, cubeRow, cube, selected } = ROW_CLASS
   return `/* dsh-theme-tone 设置行（视觉对齐官方外观行；卸载即随样式表移除） */

@@ -1,11 +1,4 @@
-/**
- * dsh-desk-one main panel.
- *
- * This file is composition only: state lives in the hooks under `hooks/`, rendering in the
- * components under `components/` and in each feature's folder. The notes wall's own behavior lives
- * in `client/notes/` (`useNoteWall` + `NotesWall`); this shell only switches tabs and wires the
- * shared header actions.
- */
+
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -34,7 +27,7 @@ import { DeskHeader } from './DeskHeader.js'
 import { readInitialTab } from './utils.js'
 import { subscribePanelReset } from './panelReset.js'
 
-/** Page props: main-panel owner share + injected actions + locale seat (assembled by the host). */
+
 type DeskPanelProps = PropsRuntime<'main'> & InjectFace<DeskPanelInjected> & PropsLocale<typeof LOCALE_NAMESPACE>
 
 export function DeskOnePage(props: DeskPanelProps) {
@@ -44,7 +37,7 @@ export function DeskOnePage(props: DeskPanelProps) {
     listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup, sessionLink, sessionsArchive, schedule,
     notebook, workspaceAccess, openReview, openBrowser, startWithPrompt, initialTab, pin,
   } = props
-  // A left-rail entry opens its own tab; the base entry (no initialTab) resumes the last visited tab.
+
   const [tab, setTab] = useState<Tab>(() => initialTab ?? readInitialTab())
   const scheduleActionsRef = useRef<ScheduleHeaderActions | null>(null)
   const [onSourcesPage, setOnSourcesPage] = useState(false)
@@ -52,8 +45,8 @@ export function DeskOnePage(props: DeskPanelProps) {
 
   const [pinnedHere, setPinnedHere] = useState<boolean>(() => pin.isPinned(tab))
 
-  // A pinned tab entry is part of the left rail only while its tab is pinned; keep the header
-  // toggle in sync when the tab changes (the base entry can switch tabs in place).
+
+
   useEffect(() => {
     setPinnedHere(pin.isPinned(tab))
   }, [pin, tab])
@@ -69,18 +62,18 @@ export function DeskOnePage(props: DeskPanelProps) {
     try {
       window.localStorage.setItem(TAB_STORAGE_KEY, next)
     } catch {
-      // Storage unavailable (private mode): keep the choice for this session only.
+
     }
   }, [])
 
-  /** "和 DSH 一起": put one prompt into the Workspace blank's composer (never sends). */
+
   const askDesk = useCallback((prompt: string): void => {
     startWithPrompt(prompt)
   }, [startWithPrompt])
 
-  // Pinned left-rail entries own exactly one tab. Clicking such a row while this panel is already
-  // active produces no store notification (same panel id), so the click arrives through the
-  // out-of-band bridge and returns the panel's strip to its entry tab instead of looking dead.
+
+
+
   useEffect(() => {
     if (initialTab === undefined) return undefined
     return subscribePanelReset(requested => {
@@ -88,7 +81,7 @@ export function DeskOnePage(props: DeskPanelProps) {
     })
   }, [initialTab])
 
-  // Notes wall: data, trash, geometry … and the wall's own behavior (create / raise / commit).
+
   const data = useNotesData(t, { listNotes, updateNote, deleteNote })
   const trash = useTrash({
     notes: data.notes,
@@ -111,8 +104,8 @@ export function DeskOnePage(props: DeskPanelProps) {
     createNote,
   })
 
-  // Task board data + state live here (not inside TaskBoard) so the shared header can own the
-  // view actions: new task, sort mode and the archive toggle.
+
+
   const taskData = useTasksData(t, { listTasks, createTask, updateTask, deleteTask })
   const groupsData = useGroupsData(t, { listGroups, createGroup, updateGroup, moveGroup, archiveGroup, deleteGroup })
   const sessionSnapshot = useSessionLinks(sessionLink)
@@ -132,8 +125,8 @@ export function DeskOnePage(props: DeskPanelProps) {
     archiveGroup: groupsData.archiveGroup,
   })
 
-  // Notebook data + view state live here (not inside NotebookView) so the shared header can own
-  // the page's primary actions and the page can keep its workspace switcher in one place.
+
+
   const notebookPage = useNotebookPage({
     t,
     active: tab === 'notebook',
@@ -168,8 +161,8 @@ export function DeskOnePage(props: DeskPanelProps) {
           setTaskSortMode: board.setSortMode,
           archivedCount: board.archivedTasks.length,
         })
-      // The notebook page renders its workspace switcher in the body; the header keeps the
-      // secondary "open file browser" action.
+
+
       : tab === 'notebook'
         ? <NotebookHeaderActions t={t} page={notebookPage} />
         : scheduleActions({
@@ -266,5 +259,5 @@ export function DeskOnePage(props: DeskPanelProps) {
   )
 }
 
-// Keep the translator type referenced so the exported composition stays self-documenting.
+
 export type { DeskTranslator }

@@ -1,7 +1,4 @@
-/**
- * Session archive pure logic. Split by area (config / facts / tree / cache); this file only
- * aggregates them so callers keep importing './archive.js'.
- */
+
 
 export {
   TRASH_SIDECAR, isDeleteConfirmationSufficient, isSafeSessionDirName, maskHomePath, normalizeArchiveConfig, sanitizeSegment,

@@ -1,4 +1,4 @@
-/** 构建 DSH 客户端 lazy-CJS 工厂包：window.__ModuleLoader__.load({ id, factory }) 。 */
+
 import { build } from 'esbuild'
 import { resolve } from 'node:path'
 

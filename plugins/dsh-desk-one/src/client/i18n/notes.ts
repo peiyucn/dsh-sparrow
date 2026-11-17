@@ -1,4 +1,4 @@
-/** Locale fragment: sticky-note wall, note cards and the trash view. */
+
 
 export const zh = {
   'note.created': '创建于',
@@ -13,7 +13,7 @@ export const zh = {
   'wall.tipAlt': '或点击顶栏「+便签」，也可以直接对我说',
 } as const
 
-/** Same keys as `zh`; the `satisfies` keeps the two views in lockstep at compile time. */
+
 export const en = {
   'note.created': 'Created',
   'note.placeholder': 'Write something…',

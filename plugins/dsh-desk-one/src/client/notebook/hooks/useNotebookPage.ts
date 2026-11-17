@@ -1,10 +1,4 @@
-/**
- * Notebook page controller: composes the library data (`useNotebookLibrary`), the list view
- * (`useNotebookRows`) and the page's actions (`useNotebookActions`) into the single controller the
- * page body and the panel header share. Keeping the controller here (owned by `DeskOnePage`) lets
- * the header and the page read the same workspace / busy state without either reaching into the
- * other's component tree.
- */
+
 
 import { useCallback, useState } from 'react'
 import type { DeskTranslator } from '../../app/types.js'
@@ -19,12 +13,7 @@ import { useNotebookRows } from './useNotebookRows.js'
 
 export type { NotebookMode, NotebookPageController, NotebookRow } from '../page-types.js'
 
-/**
- * Create the notebook page controller.
- * @param input - translator, whether the notebook tab is on screen, the notebook API, workspace access,
- *   and the review / browser bridges.
- * @returns controller consumed by `NotebookView` and `NotebookHeaderActions`.
- */
+
 export function useNotebookPage(input: {
   readonly t: DeskTranslator
   readonly active: boolean

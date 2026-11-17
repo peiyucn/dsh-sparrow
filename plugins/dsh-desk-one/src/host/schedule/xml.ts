@@ -1,26 +1,11 @@
-/**
- * Minimal XML extraction for WebDAV multistatus responses.
- *
- * A full XML parser is intentionally avoided: only four shallow shapes are read (response /
- * href / status / prop), all under the control of the CalDAV server. Matching is by local name so
- * namespace prefixes (`D:`, `d:`, `C:`, `cal:`, vendor `ns0:`) cannot change the result, and the
- * XML entities that appear in hrefs / display names / escaped iCalendar data are decoded.
- *
- * This is not a general XML parser: comments are stripped, CDATA is preserved verbatim, and
- * nested elements with the same local name are not supported (none of the read shapes need it).
- */
+
 
 export interface ParsedResponse {
-  /** Text of the response-level `href` (may be relative; callers resolve it against the request URL). */
+
   href: string
-  /** HTTP status line, e.g. `HTTP/1.1 200 OK`; empty when the server omitted it. */
+
   status: string
-  /**
-   * Values of the properties we care about, keyed by local name:
-   * `displayname`, `resourcetype` (raw inner markup), `calendar-data`, `getetag`,
-   * `getcontenttype`, `sync-token`, `current-user-principal` (href),
-   * `calendar-home-set` (href).
-   */
+
   props: Record<string, string | undefined>
 }
 
@@ -45,7 +30,7 @@ const NAMED_ENTITIES: Record<string, string> = {
 
 const CDATA_RE = /<!\[CDATA\[([\s\S]*?)\]\]>/g
 
-/** Extract every top-level `<response>` of a multistatus document. */
+
 export function parseMultistatus(xml: string): ParsedResponse[] {
   if (typeof xml !== 'string' || xml.trim() === '') return []
   const source = stripComments(xml)
@@ -67,7 +52,7 @@ export function parseMultistatus(xml: string): ParsedResponse[] {
           if (isSuccessStatus(statusText)) {
             if (firstSuccessStatus === '') firstSuccessStatus = statusText
           } else {
-            // A non-2xx propstat only reports missing properties; never merge its values.
+
             continue
           }
         }
@@ -129,14 +114,7 @@ function findElement(source: string, localName: string): ElementSpan | null {
   return findElements(source, localName)[0] ?? null
 }
 
-/**
- * Remove XML comments without a single multi-character regex replace.
- *
- * A nested / malformed `<!--` can survive one replace, and CodeQL's
- * `js/incomplete-multi-character-sanitization` correctly flags that shape as an HTML-injection
- * risk. The scanner appends only slices outside comment bodies, so the result never contains a
- * `<!--` opener; an unclosed comment is dropped to the end instead of leaking its contents.
- */
+
 function stripComments(xml: string): string {
   let out = ''
   let index = 0
@@ -154,14 +132,7 @@ function stripComments(xml: string): string {
   return out
 }
 
-/**
- * Strip XML tags by scanning for `<` and its closing `>`.
- *
- * A regex that only matches `<[^>]*>` leaves an unclosed `<script` fragment in the text, which
- * CodeQL flags as incomplete sanitization. This scanner appends only text before `<` and drops an
- * unclosed fragment to the end, so raw markup can never survive. Entity-decoded `<` is data and is
- * decoded after this step, matching the previous `textOf` semantics.
- */
+
 function stripTags(text: string): string {
   let out = ''
   let index = 0
@@ -179,17 +150,17 @@ function stripTags(text: string): string {
   return out
 }
 
-/** Strip markup, decode entities and trim. CDATA content is kept byte-for-byte (no entity decoding). */
+
 function textOf(raw: string): string {
   if (raw === '') return ''
   const cdata: string[] = []
   let text = raw.replace(CDATA_RE, (_match, content: string) => {
     cdata.push(content)
-    return `\u0000${cdata.length - 1}\u0000`
+    return `\uE000${cdata.length - 1}\uE000`
   })
   text = stripTags(text)
   text = decodeEntities(text)
-  text = text.replace(/\u0000(\d+)\u0000/g, (_match, index: string) => cdata[Number(index)] ?? '')
+  text = text.replace(/\uE000(\d+)\uE000/g, (_match, index: string) => cdata[Number(index)] ?? '')
   return text.trim()
 }
 

@@ -1,7 +1,4 @@
-/**
- * Top-row panels: "Start" create card, Today (events + clickable counts) and Upcoming (day-range
- * slider). They share the row so their internal rhythm is written together.
- */
+
 
 import { addDays, calendarColorOf, dayKey, eventDayKeys, formatClock24h, formatDateLabel, weekdayLabel, weekdayLabels } from './utils.js'
 import { dayLabel, eventTitle } from './shared.js'
@@ -12,10 +9,10 @@ import type { CSSProperties, ReactElement } from 'react'
 import type { DeskCalendar, DeskEvent } from '../../contract.js'
 import type { DeskTranslator } from '../app/types.js'
 
-/* ------------------------------ upcoming panel ------------------------------- */
+
 
 export interface UpcomingRange {
-  /** Inclusive day count starting tomorrow: 1..SCHEDULE_UPCOMING_MAX_DAYS. */
+
   readonly days: number
   readonly from: Date
   readonly to: Date
@@ -39,7 +36,7 @@ export function UpcomingPanel(props: {
       .sort((left, right) => left.start.localeCompare(right.start))
   }, [events, range.from, range.to])
   const shown = visible.slice(0, 3)
-  // The thumb only shows the handle; tinting the track to this ratio makes the selected span visible.
+
   const fillPct = ((range.days - 1) / (SCHEDULE_UPCOMING_MAX_DAYS - 1)) * 100
   return (
     <section className="dsh-desk-schedule-upcoming">
@@ -79,14 +76,14 @@ export function UpcomingPanel(props: {
   )
 }
 
-/* --------------------------------- today panel -------------------------------- */
+
 
 export interface TodayContext {
   readonly notesCount: number
   readonly openTasks: number
   readonly activeSessions: number
   readonly onAddNote: () => void
-  /** Open the notebook tab (library + review entry). */
+
   readonly onOpenNotebook: () => void
   readonly onAddTask: () => void
   readonly onOpenNotes: () => void
@@ -94,7 +91,7 @@ export interface TodayContext {
   readonly onOpenSessions: () => void
 }
 
-/** Same plus glyph as the shared header actions, so Today's create buttons match their language. */
+
 const plusIcon = (
   <svg viewBox="0 0 20 20" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
     <path d="M10 4.5v11M4.5 10h11" />
@@ -108,7 +105,7 @@ export function TodayPanel(props: {
   readonly calendars: readonly DeskCalendar[]
   readonly context: TodayContext
   readonly onOpenEvent: (event: DeskEvent, point?: ClickPoint) => void
-  /** Jumps to the full calendar list for today: the "N events" shortcut. */
+
   readonly onOpenSchedule: () => void
 }): ReactElement {
   const { t, today, events, calendars, context } = props
@@ -154,10 +151,7 @@ export function TodayPanel(props: {
   )
 }
 
-/**
- * Narrow "Start" card holding the three create actions. They stack vertically and stretch, so the
- * row can stay short while each button is taller than a plain toolbar button.
- */
+
 export function StartPanel(props: {
   readonly t: DeskTranslator
   readonly context: TodayContext
@@ -180,4 +174,3 @@ export function StartPanel(props: {
     </section>
   )
 }
-

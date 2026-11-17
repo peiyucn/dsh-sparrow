@@ -1,4 +1,4 @@
-/** Archive view rows plus the floating session preview / expanded chip. */
+
 
 export const TASK_ARCHIVE_CSS = `
 /* Archive view: same row anatomy as the notes trash. */

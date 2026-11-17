@@ -1,8 +1,4 @@
-/**
- * Leading decoration for a Session row started by the review flow: the Desk One mark (「✦」) in the
- * official business blue (see review-styles.ts). The official slot owns the 16px cell and replaces
- * it with a status dot whenever the row has a higher-priority state, so this stays purely decorative.
- */
+
 
 import { useEffect, useState, type ReactNode } from 'react'
 import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'

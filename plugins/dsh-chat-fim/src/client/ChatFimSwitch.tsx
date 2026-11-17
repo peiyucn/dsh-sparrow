@@ -1,7 +1,4 @@
-/**
- * 输入框工具行左侧的开关胶囊（挂在 conversation.input.left）：点击切换开关，右侧 ▾ 弹出触发灵敏度三档。
- * 类名一律取自 styles.ts 的类名表；本文件不含任何 CSS。
- */
+
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -15,19 +12,19 @@ import {
 import { CHAT_FIM_CLASS } from './styles.js'
 import type { TriggerSensitivity } from '../suggest.js'
 
-/** 类名表别名：JSX 与事件里的选择器都走它，不手写字符串。 */
+
 const cls = CHAT_FIM_CLASS
 
-/** 灵敏度弹层预宽：左缘对齐后向窗内钳制时用的宽度上界。 */
+
 const PICKER_MAX_WIDTH = 360
 
-/** 高/中/低 → 自下而上点亮 3/2/1 个点（恒显 3 个占位点，档位只靠颜色区分）。 */
+
 const DOT_LIT_COUNT: Record<TriggerSensitivity, number> = { eager: 3, standard: 2, conservative: 1 }
 
-/** 灵敏度三档的展示顺序（弹层选项与三点顺序同源）。 */
+
 const SENSITIVITY_LEVELS = ['eager', 'standard', 'conservative'] as const
 
-/** 输入框工具行左侧的开关胶囊：点击切换开关，右侧 ▾ 弹出触发灵敏度三档。 */
+
 export function ChatFimSwitch(props: ChatFimSwitchProps) {
   const { t } = props
   const enabled = useSuggestEnabled()
@@ -39,10 +36,10 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
   const [pickerPoint, setPickerPoint] = useState<{ x: number; y: number; up: boolean } | null>(null)
   const switchRef = useRef<HTMLButtonElement | null>(null)
 
-  /** 档位显示名（locale）。 */
+
   const label = t(`sensitivity.${sensitivity}`)
 
-  /** 依据开关胶囊矩形计算弹层锚点：左缘对齐开关（官方 Menu 的 start 对齐），贴右窗缘时向内钳制；空间不够向上弹出。 */
+
   const computePickerPoint = (): { x: number; y: number; up: boolean } | null => {
     const rect = switchRef.current?.getBoundingClientRect()
     if (rect === undefined) return null
@@ -57,8 +54,8 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
     setPickerOpen(true)
   }
 
-  // 弹层打开时：点外部关闭、Esc 关闭；滚动/缩放**跟随重定位**（官方下拉行为，
-  // 不关闭——生成中的会话流式输出会带动聊天区滚动，关掉弹层就是这里的 bug）。
+
+
   useEffect(() => {
     if (!pickerOpen) return
     const onPointerDown = (event: PointerEvent): void => {
@@ -73,7 +70,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
     const reposition = (): void => {
       const next = computePickerPoint()
       if (next === null) setPickerOpen(false)
-      // 滚动事件高频（逐帧）：锚点数值无变化时不写状态，避免逐事件重渲染。
+
       else setPickerPoint(prev => (anchorPointsEqual(prev, next) ? prev : next))
     }
     document.addEventListener('pointerdown', onPointerDown, true)
@@ -99,7 +96,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
         aria-pressed={enabled}
         aria-busy={busy}
         onClick={() => {
-          // 标签点击恒切换开关；弹层开着时一并收起（官方 PermissionSelect 触发器再点即合）。
+
           if (pickerOpen) setPickerOpen(false)
           setSuggestEnabled(!enabled)
         }}
@@ -115,7 +112,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
           aria-label={t('sensitivity.aria', { label })}
           title={t('sensitivity.aria', { label })}
           onClick={(event) => {
-            // 灵敏度触发区（三点 + ▾）：只开合灵敏度菜单，不切换开关；再点收起（官方 PermissionSelect 同款 toggle）。
+
             event.stopPropagation()
             if (pickerOpen) setPickerOpen(false)
             else openPicker()
@@ -160,7 +157,7 @@ export function ChatFimSwitch(props: ChatFimSwitchProps) {
               transform: pickerPoint.up ? 'translateY(-100%)' : undefined,
             }}
             onMouseDown={(event) => {
-              // 防止点按把焦点从输入框夺走（combobox 惯例）。
+
               event.preventDefault()
             }}
           >

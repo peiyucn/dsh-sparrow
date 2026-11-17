@@ -1,14 +1,8 @@
-/**
- * Browser trust fence: same rules as the official `isTrustedApiRequest` / `isLoopbackHostname`, pure logic for unit tests.
- * The plugin carries this gate itself: the official fence only hangs on routes prefixed `/api`, while webServer's prefix
- * matching picks the longest hit, and this plugin's `/api/desk-one` is longer ⇒ the official gate (including browser
- * token auth) never runs. The Host fence applies to every request — DNS rebinding cannot forge Host; opaque origins
- * whose Origin is "null" are rejected.
- */
+
 
 import { PACKAGE_NAME } from './constants.js'
 
-/** Normalize a Host header authority (lowercase hostname, default port dropped, IPv6 in brackets); undefined when unparseable. */
+
 export function parseAuthority(authority: string): URL | undefined {
   try {
     return new URL(`http://${authority}`)
@@ -17,7 +11,7 @@ export function parseAuthority(authority: string): URL | undefined {
   }
 }
 
-/** Whether the address is loopback: `localhost`, the IPv6 loopback, or any IPv4 in 127/8. */
+
 export function isLoopbackHostname(hostname: string): boolean {
   if (hostname === 'localhost' || hostname === '[::1]') return true
   const parts = hostname.split('.')
@@ -26,13 +20,13 @@ export function isLoopbackHostname(hostname: string): boolean {
     && parts.every(part => /^\d{1,3}$/.test(part) && Number(part) <= 255)
 }
 
-/** Canonical authority form: `hostname:port` when a port was written, otherwise just `hostname`. */
+
 function canonicalAuthority(entry: string, entryUrl: URL): string {
   const port = entryUrl.port !== '' ? entryUrl.port : new URL(`https://${entry}`).port
   return port === '' ? entryUrl.hostname : `${entryUrl.hostname}:${port}`
 }
 
-/** Whether an entry matches the request authority: entries with a port match only that exact authority, entries without a port match that hostname on any port. */
+
 export function isTrustedAuthority(hostUrl: URL, allowedHosts: readonly string[]): boolean {
   return allowedHosts.some((entry) => {
     const entryUrl = parseAuthority(entry)
@@ -43,7 +37,7 @@ export function isTrustedAuthority(hostUrl: URL, allowedHosts: readonly string[]
   })
 }
 
-/** Assert that an `allowedHosts` entry is a bare authority (`host` or `host:port`). */
+
 export function assertTrustedAuthority(entry: string): void {
   const entryUrl = parseAuthority(entry)
   if (entryUrl !== undefined && canonicalAuthority(entry, entryUrl) === entry.toLowerCase()) return
@@ -78,11 +72,7 @@ function bindAddressAuthority(ctx: { get(name: string): unknown }): readonly str
   return [address.includes(':') ? `[${address}]` : address]
 }
 
-/**
- * Extra trust surface beyond loopback: `webStartup.trustedHosts` first, falling back to `webRuntime` on older hosts,
- * plus the webServer's listen bind address; invalid entries are dropped with a warning instead of throwing (a broken
- * official trust surface should not disable the plugin).
- */
+
 export function officialTrustedHosts(ctx: {
   get(name: string): unknown
   logger?: { warn(message: string): void }
@@ -106,7 +96,7 @@ export function officialTrustedHosts(ctx: {
   return trusted
 }
 
-/** Request check with the same rules as the official one: Host must be loopback or hit the trust surface, and must not be cross-site / cross-origin. */
+
 export function isTrustedPluginRequest(
   headers: { host?: string; origin?: string; 'sec-fetch-site'?: string },
   allowedHosts: readonly string[] = [],

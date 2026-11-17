@@ -1,11 +1,4 @@
-/**
- * Storage domain declaration (`ctx.storageDomain`): node schemas are zod, names follow the
- * official UNIT_NAME_RE rule. Layout is `per-record`: each object is its own record, which suits
- * the desk's sparse, individually-editable nodes.
- *
- * Kinds share one `nodes` table (adding a kind extends the schema only). A malformed or unknown
- * record must never brick the domain: the discriminated union reads each record by its `kind`.
- */
+
 
 import { z } from 'zod'
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
@@ -15,7 +8,7 @@ import {
 } from '../constants.js'
 import type { DeskEdge, DeskNode } from '../contract.js'
 
-/** Shared base fields of every Desk node (kept explicit per schema for readable validation errors). */
+
 const noteSchema = z.object({
   id: z.string().min(1),
   kind: z.literal('note'),
@@ -25,9 +18,9 @@ const noteSchema = z.object({
   tags: z.array(z.string()),
   color: z.enum(NOTE_COLORS),
   pinned: z.boolean(),
-  // Old records predate the trash field; default false keeps them readable without migration.
+
   trashed: z.boolean().default(false),
-  // Optional wall geometry / layer: absent fields fall back to defaults, so no migration is needed.
+
   x: z.number().optional(),
   y: z.number().optional(),
   width: z.number().optional(),
@@ -52,11 +45,11 @@ const taskSchema = z.object({
     timezone: z.string().optional(),
   }).optional(),
   order: z.number().int().nonnegative(),
-  /** Membership is a group id; the group entity owns name / lane / order. */
+
   groupId: z.string().optional(),
-  // Linked DSH sessions (opaque ids). Old records default to [] without migration.
+
   sessionIds: z.array(z.string().min(1)).max(MAX_TASK_SESSIONS).default([]),
-  // "Archive" is a task-board concept; this naming was chosen to avoid colliding with the host's session archive.
+
   archived: z.boolean().default(false),
   projectId: z.string().optional(),
   laneId: z.string().optional(),
@@ -65,7 +58,7 @@ const taskSchema = z.object({
   revision: z.number().int().positive(),
 })
 
-/** One-level task group: a real entity (can be empty, renamed, reordered) owned by a lane. */
+
 const groupSchema = z.object({
   id: z.string().min(1),
   kind: z.literal('group'),
@@ -73,21 +66,21 @@ const groupSchema = z.object({
   name: z.string().min(1),
   status: z.enum(TASK_STATUSES),
   order: z.number().int().nonnegative(),
-  // Groups can be archived as a unit; old records default to false without migration.
+
   archived: z.boolean().default(false),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
   revision: z.number().int().positive(),
 })
 
-/** Sync failure details kept on the source / calendar record (never credentials). */
+
 const scheduleErrorSchema = z.object({
   code: z.string().min(1),
   message: z.string(),
   at: z.string().min(1),
 })
 
-/** One connection per provider+channel; the secret lives in `ctx.credentials`, not here. */
+
 const scheduleSourceSchema = z.object({
   id: z.string().min(1),
   kind: z.literal('schedule-source'),
@@ -105,7 +98,7 @@ const scheduleSourceSchema = z.object({
   revision: z.number().int().positive(),
 })
 
-/** One remote calendar under a source; v1 is always read-only. */
+
 const calendarSchema = z.object({
   id: z.string().min(1),
   kind: z.literal('calendar'),
@@ -127,7 +120,7 @@ const calendarSchema = z.object({
   revision: z.number().int().positive(),
 })
 
-/** One mirrored event instance (recurring events are expanded to instances in the mirror window). */
+
 const eventSchema = z.object({
   id: z.string().min(1),
   kind: z.literal('event'),
@@ -174,7 +167,7 @@ const sessionIndexSchema = z.object({
   revision: z.number().int().nonnegative(),
 })
 
-/** One unsaved annotation (source-line anchored in the code view). */
+
 const annotationSchema = z.object({
   id: z.string().min(1),
   quote: z.string(),
@@ -185,21 +178,21 @@ const annotationSchema = z.object({
   createdAt: z.string().min(1),
 })
 
-/** The single linked notes-root record (fixed id). */
+
 const notebookConfigSchema = z.object({
   id: z.string().min(1),
   kind: z.literal('notebook-config'),
   schema: z.number().int().positive(),
   rootPath: z.string().min(1),
-  // Optional (absent in older records): the drafting skill; the picker is gone, the field stays so
-  // old profiles keep validating.
+
+
   skillName: z.string().min(1).nullable().optional(),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
   revision: z.number().int().positive(),
 })
 
-/** One lazily assigned file identity (survives renames while content matches). */
+
 const noteFileSchema = z.object({
   id: z.string().min(1),
   kind: z.literal('note-file'),
@@ -212,7 +205,7 @@ const noteFileSchema = z.object({
   revision: z.number().int().positive(),
 })
 
-/** One submitted review: annotations plus the file snapshot metadata. */
+
 const reviewRecordSchema = z.object({
   id: z.string().min(1),
   kind: z.literal('review-record'),
@@ -227,7 +220,7 @@ const reviewRecordSchema = z.object({
   createdAt: z.string().min(1),
 })
 
-/** One file's persisted draft box; legacy records (cwd-keyed) only need to parse. */
+
 const noteDraftSchema = z.object({
   id: z.string().min(1),
   kind: z.literal('note-draft'),
@@ -242,7 +235,7 @@ const noteDraftSchema = z.object({
   revision: z.number().int().positive(),
 })
 
-/** Withdrawn record kinds: tolerated only so an upgrade opens the domain; purged at open. */
+
 const legacyAnnotationSchema = z.object({
   id: z.string().min(1),
   kind: z.literal('annotation'),
@@ -299,9 +292,9 @@ export const DESK_DOMAIN = defineDomain({
   name: DOMAIN_NAME,
   version: DOMAIN_VERSION,
   layout: 'per-record',
-  // A record this build cannot parse must never take the whole domain (and every plugin route)
-  // down: back it up and open without it. The legacy notebook-config kind is still parsed above,
-  // so profiles written before the annotation refactor open cleanly.
+
+
+
   invalidRecords: 'backup-and-skip',
   tables: {
     [NODES_TABLE]: domainTable<string, DeskNode>(nodeSchema as unknown as z.ZodType<DeskNode>),

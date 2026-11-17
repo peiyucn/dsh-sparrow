@@ -1,9 +1,4 @@
-/**
- * One sticky note on the wall.
- *
- * The textarea is uncontrolled on purpose: typing must not re-render the whole wall. External
- * changes (agent or reload) are pushed in via the sync effect, and a blur commits the body.
- */
+
 
 import { useEffect, useRef } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
@@ -37,7 +32,7 @@ export function NoteCard({
   useEffect(() => {
     const element = textareaRef.current
     if (element === null) return
-    // Never fight the user's cursor: only sync when the field is not focused.
+
     if (document.activeElement !== element && element.value !== display) element.value = display
   }, [display])
 
@@ -93,7 +88,7 @@ export function NoteCard({
       <textarea
         ref={textareaRef}
         className="dsh-desk-note-body"
-        // Legacy notes may only have a title; showing it as the body avoids an empty sticker.
+
         defaultValue={display}
         placeholder={t('note.placeholder')}
         spellCheck={false}

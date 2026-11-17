@@ -1,7 +1,4 @@
-/**
- * Shared schedule helpers: the pieces every schedule view needs (title fallback, day labels,
- * provider keys, weekend test). Kept separate so the panel modules stay readable.
- */
+
 
 import { formatDateLabel, formatDayTitle, weekdayLabel, weekdayLabels } from './utils.js'
 import type { DeskEvent } from '../../contract.js'
@@ -26,4 +23,3 @@ export interface ClickPoint {
   readonly x: number
   readonly y: number
 }
-

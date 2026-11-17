@@ -1,25 +1,12 @@
-/**
- * 官方**写死了面与字**、或材质在深色玻璃上读起来不对的少数浮层：本表统一做「官方材料修正」，
- * 不带「官方默认」门（与色调偏好无关，任何音色下都该修）。
- *
- * 左边栏 hover 卡（HoverCard）的材料修正不在这里：rc.3 起官方改吃 `--dsw-alias-hovercard-*`
- * 设计 token，本插件在 `tones.ts` 的公开 token 覆盖层里全局覆盖这四个 token ⇒ 不再需要按 portal
- * 包装节点的 hashed 类名锚定卡根（见 docs/private-seams.md §B1）。
- * 本文件只处理仍需要 DOM 锚点的三类：① 停靠卡 / ② 菜单分组标题 / ③ 输入框触发菜单。
- */
 
-/** 菜单分组标题（模型选择列表等）：官方给了 sticky 却没给背景，列表标题滚动时条目从标题下面穿过。 */
+
+
 const MENU_GROUP_HEADING = '[data-menu-group-heading]'
-/* 菜单材质 / 相位动画交回官方（0.2.2 观感还原；嵌套 backdrop 闪块为本版已知限制，不在插件内规避）。 */
-/** 停靠卡（todo / goal / queue）：官方材质是半透明菜单玻璃，几张叠在一起互相透，只有最上面一张看得出磨砂。 */
+
+
 const DOCK_TODO = "[data-composer-seat] [data-testid='todo-panel']"
 const DOCK_CHILD_GLASS = "[data-composer-seat] :is([data-goal-bar], [data-queue-dock]) > *::before"
-/**
- * 输入框触发菜单（@ / 斜杠 候选列表）的「下面还有内容」提示：官方用 ::after 画一条 16px 的渐变条
- * （悬在底边上方、颜色取菜单材质色），在深色玻璃上会叠成一条发亮的硬边长方形。
- * 适配方式：不再用这条色块，改成**淡出列表内容本身**——菜单带 `data-overflow-below` 时把列表底部
- * 26px 渐隐（顶部同理），滚到底时官方会移除该属性、渐隐自然消失。提示语义保留且更直观。
- */
+
 const TRIGGER_MENU = '[data-trigger-menu]'
 const TRIGGER_MENU_VIEWPORT = '[role="listbox"]'
 const TRIGGER_MENU_FADE = `${TRIGGER_MENU}::after`

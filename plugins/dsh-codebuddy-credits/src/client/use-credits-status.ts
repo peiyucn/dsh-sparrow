@@ -1,8 +1,4 @@
-/**
- * 额度入口的状态面：/status（含模型事实、Max 模式同步）与 /quota（展开面板才拉）。
- * 两条请求各有独立序号——共用会让并发请求互相作废、面板卡在「读取中」。
- * 模块级状态缓存让槽位重挂载（切会话/视图）时以旧值初始化，避免「空 → 出现」闪烁。
- */
+
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { API_PREFIX } from '../constants.js'
@@ -25,11 +21,11 @@ export interface StatusPayload {
   keyConfigured: boolean
   account?: { enterpriseName?: string; accountType?: string; enterpriseUserName?: string; nickname?: string }
   models: ModelFactView[]
-  /** Max 模式（推理档位锁）状态，随 /status 下发。 */
+
   maxMode?: boolean
 }
 
-/** 模块级状态缓存：槽位重挂载时以它初始化。 */
+
 let cachedStatus: StatusPayload | undefined
 
 export interface CreditsStatusState {
@@ -45,10 +41,10 @@ export function useCreditsStatus(
 ): CreditsStatusState {
   const [status, setStatus] = useState<StatusPayload | undefined>(() => cachedStatus)
   const [loadError, setLoadError] = useState<string | undefined>(undefined)
-  // 配额独立于 /status（图标出现不等配额请求），展开面板时才拉 /quota。
+
   const [quota, setQuota] = useState<QuotaView | undefined>(undefined)
   const [quotaError, setQuotaError] = useState<string | undefined>(undefined)
-  // 两个加载器各自独立的请求序号（见文件头）。
+
   const statusSeq = useRef(0)
   const quotaSeq = useRef(0)
 
@@ -65,9 +61,9 @@ export function useCreditsStatus(
       const payload = await response.json() as StatusPayload
       cachedStatus = payload
       setStatus(payload)
-      // 模型事实随 /status 刷入共享事实表（选择器模型行同源读取）。
+
       syncModelFacts(payload.models ?? [])
-      // Max 模式状态随 /status 同步进共享 store（选择器档位面板同源读取）。
+
       if (payload.maxMode !== undefined) syncMaxMode(payload.maxMode)
     } catch {
       if (seq !== statusSeq.current) return
@@ -75,7 +71,7 @@ export function useCreditsStatus(
     }
   }, [t])
 
-  /** 展开面板时拉取配额（独立于 /status，不阻塞图标出现）。 */
+
   const loadQuota = useCallback(async () => {
     const seq = ++quotaSeq.current
     setQuotaError(undefined)
@@ -94,7 +90,7 @@ export function useCreditsStatus(
     }
   }, [t])
 
-  // 挂载即读状态；配置卡保存/清空 Key 广播的窗口事件与窗口重新聚焦都会触发刷新。
+
   useEffect(() => {
     void loadStatus()
     const onStatusChanged = () => { void loadStatus() }

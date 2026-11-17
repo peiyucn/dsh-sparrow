@@ -1,15 +1,8 @@
-/**
- * client half 挂**官方既有槽位**（不遮蔽任何官方控件）：settings.models.provider-card（Key 配置卡）、
- * conversation.session.header.utilities（额度小卡，order -10）等；模型选择器 = **官方 ui-model-selection**
- * （本插件的模型经 host 侧 ctx.llm.registerAdapter 注册进官方目录，官方菜单原生列出）。
- * ⚠️ **不得再注册 conversation.input.model**（那是遮蔽官方控件的旧做法）：自绘菜单要自己承担材质/portal/backdrop-filter，
- * 既重复官方能力，也把合成层的坑引进插件（owner：「codebuddy 根本就不该动官方模型菜单」）。
- * Key 经本机 host 路由存 DSH 凭据库，文案经 dsh locale。
- */
+
 
 import type { ReactNode } from 'react'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-// 纯类型空导入：为 inject 用到的客户端服务提供类型声明，勿当死代码删。
+
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-model-selection/client'
@@ -137,10 +130,16 @@ interface DirectoryStoreLike {
   subscribe(fn: () => void): () => void
 }
 
+interface ClientProbeHost {
+  readonly slots?: { readonly inject?: unknown; readonly register?: unknown }
+  readonly locale?: { readonly register?: unknown; readonly bind?: unknown }
+  readonly logger?: { warn(message: string): void }
+}
+
 export function apply(ctx: ClientContext): void {
-  const c = ctx as unknown as Record<string, any>
-  // 首行能力门（**绝不抛错**）：client entry 非 active 会让宿主整页 boot 失败。
-  // 缺失即直接 return，不注册任何样式 / 槽位 / 监听。
+  const c = ctx as unknown as ClientProbeHost
+
+
   if (!warnMissingCapabilities(c, SETTINGS_NAMESPACE, [
     { name: 'ctx.slots.inject', ok: hasCapability(() => c.slots?.inject) },
     { name: 'ctx.slots.register', ok: hasCapability(() => c.slots?.register) },
@@ -148,7 +147,7 @@ export function apply(ctx: ClientContext): void {
     { name: 'ctx.locale.bind', ok: hasCapability(() => c.locale?.bind) },
   ])) return
 
-  // 样式表统一在这里注入一次（marker + HMR 复用）；卸载时移除。
+
   const style = injectCodeBuddyStyles()
   ctx.effect(() => () => { style.remove() }, `${SETTINGS_NAMESPACE}: styles`)
   const disposeDictionaries = ctx.locale.register(LOCALE_NAMESPACE, {
@@ -163,17 +162,7 @@ export function apply(ctx: ClientContext): void {
     locale: LOCALE_NAMESPACE,
   }, CodeBuddyCreditsCard as unknown as (props: object) => ReactNode))
 
-  /**
-   * 模型行的只读事实（倍率 · 上下文）：官方 `conversation.input.model.label` 扩展槽的贡献者。
-   *
-   * ⚠️ 该槽是 **single**（官方 `ui-model-selection/src/client/slots.ts` 声明 `{ kind: 'single', scope: 'session', inline: true }`）：
-   * 同一时刻只有一个贡献者渲染整条标签。0.2.2 起官方删除了 `ui-deepseek-model-label-1017`，改为在
-   * fallback 里渲染目录角标 `model.badge`；本插件接管后必须按官方位置保留该角标（见组件），
-   * 语言文字经注入的 `ctx.locale.resolveText` 解析。
-   *  - `priority: -1` 是为了**稳定拿到渲染权**（否则谁注册得早谁赢，行为随加载顺序漂）；
-   *  - 事实串只对本插件 provider 生效（`PROVIDER_ID`），且不显示在触发器上（`placement === 'trigger'`）。
-   * ⚠️ 不注册父槽 `conversation.input.model`：选择控件仍归官方（见文件头注释）。
-   */
+
   const labelLocale = ctx.locale
   ctx.slots.inject('conversation.input.model.label', () => ctx.slots.register({
     name: 'conversation.input.model.label',
@@ -187,21 +176,21 @@ export function apply(ctx: ClientContext): void {
     }),
   }, CodeBuddyModelLabel as unknown as (props: object) => ReactNode))
 
-  // 读官方 ctx.modelDirectories（与模型选择器同一 store）；缺该服务时捕获返回 undefined。
+
   const directoryFor = (sessionId: string): DirectoryStoreLike | undefined => {
     try {
-      // 必须从根上下文取：子上下文 get 会实例化出注入不全的副本。
+
       const resolver = ctx.root.get('modelDirectories') as unknown as {
         directoryFor(id: string): { store: DirectoryStoreLike } | undefined
       } | undefined
-      // store 原样传递：快照/订阅依赖内部状态闭包，不做解构。
+
       return resolver?.directoryFor(sessionId)?.store
     } catch {
       return undefined
     }
   }
 
-  // 官方 utilities 槽位（session log 下载按钮同槽位 order 0）：order -10 渲染在其左边。
+
   ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register({
     name: 'conversation.session.header.utilities',
     id: 'codebuddy-credits',
@@ -210,8 +199,8 @@ export function apply(ctx: ClientContext): void {
     inject: () => ({ directoryFor }),
   }, CodeBuddyCreditsIndicator as unknown as (props: object) => ReactNode))
 
-  // hero 态官方 header 整体隐藏（utilities 不渲染），额度入口改经
-  // conversation.input.dock 挂载：读官方根元素 data-phase 标记，hero 相位 portal。
+
+
   ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
     name: 'conversation.input.dock',
     id: 'codebuddy-credits-hero',
@@ -220,15 +209,15 @@ export function apply(ctx: ClientContext): void {
     inject: () => ({ directoryFor }),
   }, CodeBuddyCreditsHeroAnchor as unknown as (props: object) => ReactNode))
 
-  // 每轮积分胶囊：挂在官方 Usage 胶囊同槽位（assistant-actions）。
+
   ctx.slots.inject('conversation.chat.assistant-actions', () => ctx.slots.register({
     name: 'conversation.chat.assistant-actions',
     id: 'codebuddy-credits-turn-credit',
     locale: LOCALE_NAMESPACE,
   }, CodeBuddyTurnCredit as unknown as (props: object) => ReactNode))
 
-  // 会话积分统计行：官方 activity order 0、usage order 1（ui-chat StatsPills），本条目 order 2
-  // 渲染在官方两颗胶囊之后（list 槽按 order 排，同 order 才需要 priority 决胜）。
+
+
   ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
     name: 'conversation.composer.dock',
     id: 'codebuddy-credits-stats',

@@ -1,18 +1,4 @@
-/**
- * Archived set / workspace accounting helpers.
- *
- * **User archive / unarchive actions go through the official public API**
- * (`ctx.workspaceRegistry.archiveSession/unarchiveSession`): the official write chain owns the activity
- * check, pin drop, archive-set durability and the follow-up admissions (`workspace/session-archived` /
- * `workspace/session-unarchiving`, which rc.2+ worktree reclamation listens to), so this plugin must not
- * re-implement them.
- *
- * The private write channel (`enqueueOperation` + `requireState` + `setState`) remains only for
- * **silent set maintenance that the official API cannot express**: moving to trash / permanent deletion
- * (remove ids without unarchive follow-ups), restoring from trash (add ids back without archive
- * follow-ups) and parent-child archive alignment (idempotent mirroring). Those operations must not
- * dispatch archive admissions, which is exactly why no public primitive fits.
- */
+
 
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent'
@@ -33,13 +19,7 @@ import { SessionsError } from './errors.js'
 import { cachedSnapshotOf, readStrayBlankness, summaryBlockOf, type ProjectionBlock } from './projection.js'
 import { PACKAGE_NAME } from './constants.js'
 
-/**
- * Prebuild a "session id → ids of workspaces holding it" index (performance audit: no O(n²) on the hot path).
- * The old implementation scanned all "workspaces × sessions" for every node while assembling /list; now the
- * index is built once and reused for the whole tree.
- * Output order = workspace list order; duplicate sessionId entries in one workspace are recorded once
- * (matching the old includes semantics).
- */
+
 export function workspaceIndexFor(workspaces: readonly Workspace[]): Map<string, readonly string[]> {
   const index = new Map<string, string[]>()
   for (const workspace of workspaces) {
@@ -54,18 +34,12 @@ export function workspaceIndexFor(workspaces: readonly Workspace[]): Map<string,
   return index
 }
 
-/** Whether a thrown value carries one of the official workspace error names (survives package duplication). */
+
 function isWorkspaceError(error: unknown, name: string): boolean {
   return error instanceof Error && error.name === name
 }
 
-/**
- * Map an official `workspaceRegistry.archiveSession` rejection to the route's stable error surface.
- * The official method writes nothing on these errors, so the archived set is unchanged.
- * @param sessionId - Session that was being archived.
- * @param error - Rejection from the official API.
- * @returns a `SessionsError` with the matching HTTP status/code.
- */
+
 function archiveFailureOf(error: unknown): SessionsError {
   if (isWorkspaceError(error, 'WorkspaceActiveSessionError')) {
     const activity = (error as { activity?: readonly { kind?: unknown }[] }).activity ?? []
@@ -83,15 +57,7 @@ function archiveFailureOf(error: unknown): SessionsError {
   throw error
 }
 
-/**
- * Archive one session through the official public API (activity gate, pin drop, follow-up admissions and
- * durability are all owned by the official WorkspaceRegistry). Child sessions of a newly archived parent
- * are mirrored into the archived set by {@link alignChildArchives} on the next official domain write event,
- * so the response carries the archive set as committed at call time rather than a computed subtree.
- * @param ctx - host context.
- * @param sessionId - session to archive.
- * @returns the committed archive set (as strings).
- */
+
 export async function archiveSession(ctx: Context, sessionId: SessionId): Promise<ArchiveResponse> {
   try {
     await ctx.workspaceRegistry.archiveSession(sessionId)
@@ -101,17 +67,7 @@ export async function archiveSession(ctx: Context, sessionId: SessionId): Promis
   return { ok: true, archivedIds: ctx.workspaceRegistry.archivedSessionIds.map(String) }
 }
 
-/**
- * Unarchive one session through the official public API (dispatch `workspace/session-unarchiving`, then
- * remove the id), then re-emit the "back in the list" notification.
- *
- * Why re-emit added: the client's `handleSessionAdded` merges the session into the list immediately, so the user
- * does not need to refresh; without it a refresh is required — and the refresh makes dsh load the session into
- * the live store, after which "archive again → move to trash" is blocked by the hold guard
- * (ensureSessionNotLive). Headers come from the header facts cache, sharing the single flight with /list /strays,
- * so this does not scan the disk separately; it also includes the cached projection block, so sessions with a
- * seeded projection row show their titles immediately after unarchive.
- */
+
 export async function unarchiveSession(
   ctx: Context,
   headerFacts: HeaderFactsStore<HeaderFacts>,
@@ -154,19 +110,12 @@ export async function attachWorkspaceAccounting(ctx: Context, sessionId: Session
   }
 }
 
-/** Read the archived set via the official public getter (after the channel migration, in-memory state and the
- *  domain stay in sync, so reading the domain directly is no longer needed). */
+
 export async function readArchivedIds(ctx: Context): Promise<SessionId[]> {
   return [...ctx.workspaceRegistry.archivedSessionIds]
 }
 
-/**
- * Read-modify-write of the archived set: run on the official enqueueOperation serialization chain; inside the
- * chain, requireState → compute the new set → setState (official persistence write: domain + in-memory state
- * sync in one step). If update returns the same reference, or the contents are item-by-item identical, treat it
- * as no change (removeArchivedId's filter always returns a new array, so content comparison is what makes
- * "not in the set" truly zero writes and zero event noise).
- */
+
 export function mutateArchivedSet(surface: RegistryMutationSurface, update: (ids: readonly SessionId[]) => readonly SessionId[]): Promise<void> {
   return surface.enqueueOperation(async () => {
     const state: WorkspaceDomainState = surface.requireState()
@@ -179,32 +128,18 @@ export function mutateArchivedSet(surface: RegistryMutationSurface, update: (ids
   })
 }
 
-/**
- * Archived-set cleanup after moving to the trash / permanent deletion: remove the root plus **all descendants**
- * that were actually moved/deleted, in one write chain. Official persistence has a flat sibling layout
- * (sessionDir = projectDir/encodeSegment(id), and children inherit the parent's cwd), while trash/delete moves
- * or deletes the whole subtree directory by directory, so the entire subtree must leave the archived set —
- * removing only direct children would leave depth ≥2 descendants as permanent orphan roots (their parents are
- * gone from headers, parent-child alignment skips orphans, and there is no way to remove them).
- * The caller supplies ids to remove via archivedIdsToRemove(root, all descendant ids).
- */
+
 export async function removeArchivedIds(surface: RegistryMutationSurface, ids: readonly string[]): Promise<void> {
   const remove = new Set(ids)
   await mutateArchivedSet(surface, current => current.filter(id => !remove.has(String(id))))
 }
 
-/** Add a session back to the archived set (restore from trash returns it to the hidden state); no-op if already present. */
+
 export async function addArchivedId(surface: RegistryMutationSurface, sessionId: SessionId): Promise<void> {
   await mutateArchivedSet(surface, ids => ids.some(id => String(id) === String(sessionId)) ? ids : [...ids, sessionId])
 }
 
-/**
- * Parent-child archive alignment (state invariant: children mirror parents):
- * - "parent archived, child not archived" → add the child; "parent not archived, child archived" → remove the child.
- * - Triggers: startup + official workspace domain write event (domain/changed) + lazy fallback on panel open; idempotent.
- * - Headers come from the header facts cache (single-flight / TTL / write-through invalidation), so opening the
- *   panel no longer scans the disk for alignment (previously every /list called list() directly).
- */
+
 export async function alignChildArchives(
   ctx: Context,
   surface: RegistryMutationSurface,
@@ -227,12 +162,7 @@ export async function alignChildArchives(
   }
 }
 
-/**
- * Startup sweep: remove ghost ids from the archived set that are not in persistence (legacy defense — ghost
- * entries may have been created during the old direct-write era; the channel migration no longer creates new
- * ghosts, so this remains a one-time defense).
- * Headers come from the header facts cache, sharing the same disk scan with other startup reads.
- */
+
 export async function sweepGhostArchivedIds(
   ctx: Context,
   surface: RegistryMutationSurface,
@@ -251,11 +181,7 @@ export async function sweepGhostArchivedIds(
   }
 }
 
-/**
- * Build the official api-session/added payload (a structured subset of SessionSummary): only sessionId/updatedAt/
- * running/blank are required; other fields are exposed optionally based on the header. Non-resident sessions have
- * no active event time, so updatedAt uses header.createdAt (consistent with the /list view).
- */
+
 export function addedSummaryFor(header: SessionHeader, blank: boolean): {
   sessionId: SessionId
   updatedAt: number
@@ -276,19 +202,7 @@ export function addedSummaryFor(header: SessionHeader, blank: boolean): {
   }
 }
 
-/**
- * Re-emit the official api-session/added event.
- *
- * Besides the session summary, it can carry an official **cached** projection block: the client's
- * `handleSessionAdded` applies it via `applyCached` (session-controller/src/client/sessions/manager.ts:677),
- * so the session list gets titles / subagent labels without a refresh — the key to keeping input-box @ and
- * task-board @ displays consistent after restore.
- * @param ctx - Host context.
- * @param header - Session header (source of truth for the added payload).
- * @param blank - Whether the session is blank.
- * @param projections - Optional official cached projection block; when omitted, only the entry is added and
- * titles wait for the next list refresh.
- */
+
 export function emitSessionAdded(
   ctx: Context,
   header: SessionHeader,
@@ -298,8 +212,8 @@ export function emitSessionAdded(
   try {
     ctx.emit('api-session/added', {
       ...addedSummaryFor(header, blank),
-      // Since rc.1, SessionSummary has a required `agentAvailable` (whether the session currently holds a live
-      // Agent; see `api/session-controller/src/types.ts:177-188`): match official semantics and use the agents registry.
+
+
       agentAvailable: ctx.agents.get(header.id) !== undefined,
       ...projections === undefined ? {} : {
         projections: { kind: 'cached' as const, asOfSeq: projections.asOfSeq, values: projections.values },

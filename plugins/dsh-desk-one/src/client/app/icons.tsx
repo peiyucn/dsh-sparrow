@@ -1,7 +1,4 @@
-/**
- * Toolbar icons shared by the panel header actions. Inline SVGs so the plugin ships no icon
- * dependency; stroke sizing matches the official 13px action buttons.
- */
+
 
 export const plusIcon = (
   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">

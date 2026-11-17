@@ -1,7 +1,4 @@
-/**
- * Task collection state: loading, optimistic writes and a per-task write chain.
- * Mirrors the notes store so both features share the same concurrency habits.
- */
+
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'

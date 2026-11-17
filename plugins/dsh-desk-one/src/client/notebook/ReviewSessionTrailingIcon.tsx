@@ -1,8 +1,4 @@
-/**
- * Trailing mark for a review Session while its row is busy: the official leading cell is replaced
- * by a status dot for running / pending rows, so the leading mark alone would only appear after the
- * run finishes. This one rides the trailing icon slot and yields whenever the row is idle.
- */
+
 
 import { useEffect, useState, type ReactNode } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'

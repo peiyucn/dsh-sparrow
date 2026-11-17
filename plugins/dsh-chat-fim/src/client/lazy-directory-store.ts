@@ -1,23 +1,20 @@
-/** client half 纯逻辑：目录 store 惰性订阅（首帧会话 scope 未就绪时延迟挂接，解析后订阅迁移）。 */
+
 
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
-/** 官方目录 store 最小面：快照（含 current 字段）+ 订阅（与 modelDirectories 的 store 同构）。 */
+
 export interface LazyDirectorySource<S> {
   getSnapshot(): { current: S | null }
   subscribe(listener: () => void): () => void
 }
 
-/**
- * 目录 store 惰性读取面：首帧会话 scope 未就绪时 directoryFor 会抛错，故 getSnapshot/subscribe 每次读取重试，解析成功后把等待中的订阅迁移到真实 store。
- * 必须迁移而非仅通知后清空：本适配器 subscribe 身份稳定，useSyncExternalStore 只在身份变化时重订阅，留在未决集合里的监听器此后收不到真实 store 的变更。
- */
+
 export function createLazyDirectoryStore<S>(
   directoryFor: (sessionId: SessionId) => LazyDirectorySource<S> | undefined,
   sessionId: SessionId | undefined,
 ): { getSnapshot: () => S | null; subscribe: (listener: () => void) => () => void } {
   let resolved: LazyDirectorySource<S> | undefined
-  /** 未决订阅表：listener → 迁入真实 store 后的退订函数（迁移前为 undefined）。 */
+
   const pending = new Map<() => void, (() => void) | undefined>()
   const ensure = (): LazyDirectorySource<S> | undefined => {
     if (resolved !== undefined) return resolved
@@ -26,14 +23,14 @@ export function createLazyDirectoryStore<S>(
       const hit = directoryFor(sessionId)
       if (hit !== undefined) {
         resolved = hit
-        // 订阅迁移：每个等待中的监听器挂到真实 store（退订函数存回 pending 供清理），并立即通知一次。
+
         for (const listener of pending.keys()) {
           pending.set(listener, hit.subscribe(listener))
           listener()
         }
       }
     } catch {
-      // 会话 scope 尚未就绪：保持未决，下一次读取重试。
+
     }
     return resolved
   }

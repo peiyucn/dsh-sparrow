@@ -1,7 +1,4 @@
-/**
- * dsh-desk-one host half composition root: gates -> open storage -> REST + agent tools.
- * Object logic lives in model.ts; storage in host/store.ts; HTTP shapes in host/router.ts.
- */
+
 
 import type { Context } from '@deepseek-ai/cordis'
 import { PREFIX } from './constants.js'
@@ -21,25 +18,21 @@ import { registerTaskTools } from './host/tasks/tools.js'
 export const name = 'dsh-desk-one'
 export const inject = [
   'webServer', 'storageDomain', 'tools',
-  // Session archive capabilities (A1): same hard dependencies as the archived plugin, so a host
-  // missing one disables the whole panel instead of mounting half of it.
+
+
   'sessions', 'agents', 'workspaceRegistry', 'sessionPersistence', 'sessionQuery',
 ]
 
-/**
- * host-half entry: opens the shared object store, mounts REST routes and agent tools.
- * @param ctx - DSH plugin context.
- * @param config - Plugin config injected by cordis.patch.yml (trashRoot).
- */
+
 export async function apply(ctx: Context, config: SessionsConfig = {}): Promise<void> {
-  // Host compatibility gate (root AGENTS "plugin/host compatibility"), before any registration:
-  // a missing capability throws so the plugin disables itself instead of breaking dsh.
+
+
   assertHostGates(ctx)
   const store = await DeskStore.open(ctx)
   ctx.effect(() => () => store.close(), 'dsh-desk-one: storage domain')
-  // Session gates include the session-format probe + the two private seams; failing here disables
-  // the plugin before any storage/effect is registered. Hosts without the services (unit tests,
-  // stripped builds) simply skip the session capabilities.
+
+
+
   const sessions = hasSessionServices(ctx) ? await installSessionsHost(ctx, store, config) : undefined
 
   const schedule = new ScheduleHost(ctx, store)
@@ -56,12 +49,12 @@ export async function apply(ctx: Context, config: SessionsConfig = {}): Promise<
   registerGroupTools(ctx, store)
   registerScheduleTools(ctx, schedule)
   registerNotebookTools(ctx, notebook)
-  // One short operating guide skill (object choice + revision workflow + side effects). Optional
-  // service: without it the tools still work, so this never disables the plugin.
+
+
   installDeskSkill(ctx)
   if (sessions !== undefined) {
-    // Warm the session index at startup; task/session edges resolve through it (no extra agent
-    // search tool: official session tools already cover full-text search).
+
+
     void sessions.refreshIndex().catch(() => undefined)
   }
 }

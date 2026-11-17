@@ -1,7 +1,4 @@
-/**
- * Review toolbar: mimics the official document-preview header (path, view menu, copy / refresh,
- * whole-document annotation). Only the tab's own actions live here; data comes from the controller.
- */
+
 
 import type { ReactElement } from 'react'
 import {
@@ -10,10 +7,10 @@ import {
 import type { DeskTranslator } from '../../../app/types.js'
 import type { ReviewView } from '../types.js'
 
-/** Delay before the tooltip appears (shared by the header actions). */
+
 const TOOLTIP_DELAY_MS = 400
 
-/** Render the review header. */
+
 export function ReviewHeader(props: {
   readonly t: DeskTranslator
   readonly path: string

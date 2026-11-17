@@ -1,9 +1,4 @@
-/**
- * Icon per Desk One tab, shared by the header tab strip and the optional left-rail entry.
- *
- * The official sidebar renders one row per pinned tab (label/tooltip/active state come from the
- * official component); the header renders the same glyph at 14px next to the tab label.
- */
+
 
 import type { ComponentType, ReactNode } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -18,13 +13,10 @@ import type { Tab } from './app/types.js'
 import { PANEL_TAB_ATTRIBUTE } from './app/panelReset.js'
 import { DeskGlyph } from './brand.js'
 
-/** One-pixel official glyph. */
+
 type OfficialIcon = ComponentType<{ size?: number }>
 
-/**
- * Local calendar glyph: the official set has no calendar icon (its clock reads as the Automation
- * task entry), so the Schedule tab draws its own small calendar at the same 24px/1.5px grid.
- */
+
 function ScheduleGlyph({ size = 14 }: { readonly size?: number }): ReactNode {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -40,29 +32,23 @@ const GLYPHS: Record<Tab, OfficialIcon> = {
   notebook: IconListPenOutlineRegular,
   notes: IconEditOutlineRegular,
   tasks: IconChecklistOutlineRegular,
-  // The official "session list" glyph (speech bubble with lines; the official empty-session state
-  // uses it). NOT the new-chat glyph, which belongs to the official New Session action.
+
+
   sessions: IconQueueOutlineRegular,
 }
 
-/** Header tab-strip glyph (decorative; the tab label carries the accessible name). */
+
 export function DeskTabGlyph({ tab, size = 14 }: { readonly tab: Tab; readonly size?: number }): ReactNode {
   const Icon = GLYPHS[tab]
   return <Icon size={size} />
 }
 
-/** Base "Desk One" entry glyph: the product mark, matching the header brand lockup. */
+
 export function DeskBaseIcon({ size }: PropsRuntime<'sidebar.panellist'>): ReactNode {
   return <DeskGlyph size={size} />
 }
 
-/**
- * Wrap a tab glyph as a sidebar-panellist slot component (the official row passes `size`).
- *
- * The glyph also carries the panel-tab marker: the official row has no per-entry click hook, so the
- * client install captures clicks inside this row (glyph *or* label) and resets the panel's own tab
- * strip to the tab this entry owns (see app/panelReset.ts).
- */
+
 function panellistIcon(tab: Tab) {
   return function DeskTabPanelIcon({ size }: PropsRuntime<'sidebar.panellist'>): ReactNode {
     return (
@@ -73,7 +59,7 @@ function panellistIcon(tab: Tab) {
   }
 }
 
-/** Left-rail icons for pinned tab entries. */
+
 export const DESK_TAB_ICONS: Record<Tab, ReturnType<typeof panellistIcon>> = {
   schedule: panellistIcon('schedule'),
   notebook: panellistIcon('notebook'),

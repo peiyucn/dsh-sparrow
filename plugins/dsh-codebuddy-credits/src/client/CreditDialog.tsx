@@ -1,9 +1,4 @@
-/**
- * 积分弹层皮肤（每轮 / 会话积分胶囊共用）：复刻官方 ui-chat
- * stat-dialog.module.css 配方——官方样式表不在插件依赖面内，不引入自有设计。
- * 静态皮肤在 styles.ts（`.ccb-credit-dialog*`）；定位由调用方给
- * （useCreditStatDialog 的 pos，量到真实尺寸后在视口内钳制），是这里唯一的 inline style。
- */
+
 
 import { Fragment } from 'react'
 import type { MutableRefObject } from 'react'
@@ -13,9 +8,9 @@ import { CCB_CLASS } from './styles.js'
 import type { AnchorStyles } from './statDialog.js'
 
 export interface CreditDialogProps {
-  /** 弹层本体（外点关闭判定用）。 */
+
   panelRef: MutableRefObject<HTMLDivElement | null>
-  /** 触发件的 CSS 锚点名（弹层以 positionAnchor 绑定它）。 */
+
   anchorName: string
   ariaLabel: string
   title: string
@@ -23,7 +18,7 @@ export interface CreditDialogProps {
   callsLabel: string
   calls: number
   perCallLabel: string
-  /** 按模型聚合（同模型多次调用合并一行）。 */
+
   byModel: ReadonlyArray<{ model: string; credit: number; calls: number }>
 }
 

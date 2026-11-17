@@ -1,6 +1,4 @@
-/**
- * Library helpers: path safety, single-page reads, search over indexed entries.
- */
+
 
 import { realpath, readFile, stat } from 'node:fs/promises'
 import { isAbsolute, join, win32 } from 'node:path'
@@ -11,16 +9,10 @@ import { NOTEBOOK_MAX_BYTES } from '../../constants.js'
 import { DeskError } from '../http.js'
 import { displayTitle, parsePage } from './frontmatter.js'
 
-/** How many head bytes are checked for binary content. */
+
 const BINARY_PROBE_BYTES = 8_192
 
-/**
- * Reject absolute or escaping paths; returns the normalized `/`-separated relative path.
- *
- * A Windows drive / UNC path is not absolute under POSIX (`isAbsolute('C:/x.md')` is false), but
- * accepting it would create a `C:` directory inside the library on a Linux host. Reject both path
- * dialects on every platform.
- */
+
 export function normalizeRelativePath(relativePath: string): string {
   if (isAbsolute(relativePath) || win32.isAbsolute(relativePath)) {
     throw new DeskError('BAD_BODY', '路径必须是相对路径')
@@ -36,18 +28,12 @@ export function normalizeRelativePath(relativePath: string): string {
   return clean.join('/')
 }
 
-/** Whether one absolute path stays inside the library root (both resolved). */
+
 function isWithin(rootReal: string, absoluteFile: string): boolean {
   return absoluteFile === rootReal || absoluteFile.startsWith(`${rootReal}/`) || absoluteFile.startsWith(`${rootReal}\\`)
 }
 
-/**
- * Read one page from the library.
- * @param root - absolute library root.
- * @param relativePath - caller-supplied relative path.
- * @returns the renderable page.
- * @throws DeskError for unsafe paths, missing files, binary content or oversized files.
- */
+
 export async function readPage(root: string, relativePath: string): Promise<NotebookPageResponse> {
   const relative = normalizeRelativePath(relativePath)
   const absolute = join(root, ...relative.split('/'))
@@ -82,7 +68,7 @@ export async function readPage(root: string, relativePath: string): Promise<Note
   }
 }
 
-/** Header counts over the whole library. */
+
 export function summarize(entries: readonly NotebookEntry[]): NotebookStats {
   let missingFrontmatter = 0
   let emptyBody = 0
@@ -93,14 +79,7 @@ export function summarize(entries: readonly NotebookEntry[]): NotebookStats {
   return { total: entries.length, missingFrontmatter, emptyBody }
 }
 
-/**
- * Filter indexed entries.
- * @param entries - scanned index.
- * @param query - case-insensitive text over title and path.
- * @param filters - exact frontmatter `type` / `tag`, or a derived count filter.
- * @param limit - response cap.
- * @returns matches plus the truncation flag.
- */
+
 export function searchEntries(
   entries: readonly NotebookEntry[],
   query: string,
@@ -123,4 +102,3 @@ export function searchEntries(
   })
   return { entries: matched.slice(0, limit), truncated: matched.length > limit }
 }
-

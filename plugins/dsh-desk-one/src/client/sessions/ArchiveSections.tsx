@@ -1,11 +1,4 @@
-/**
- * Session archive management sections (A2): archived tree, stray sessions and trash.
- *
- * Every destructive action is armed in place first (two-step confirm). Permanent delete no longer
- * asks the user to retype the title: the row's own title is submitted automatically on the second
- * click, and the host-side exact-title check still guards the route. The trust fence and file
- * validation live on the host; this file only renders state and confirms intent.
- */
+
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
@@ -25,7 +18,7 @@ import { SessionCopyActions } from './SessionCopyActions.js'
 import { SessionRowAction } from './SessionRowAction.js'
 import { SessionTreeRow } from './SessionTreeRow.js'
 
-/** How long the trash-path button shows "copied" (the previous inline feedback also used 2s). */
+
 const TRASH_DIR_COPY_FEEDBACK_MS = 2_000
 
 interface ArchiveSnapshot {
@@ -39,9 +32,9 @@ interface ArchiveSectionsProps {
   readonly t: DeskTranslator
   readonly api: SessionsArchiveApi
   readonly onOpen: (sessionId: string) => void
-  /** Report every id these sections display, so the active catalog can drop stale rows. */
+
   readonly onKnownChange?: (known: KnownSessions) => void
-  /** Parent bump: an active session was archived and the archived pane must reload to show it. */
+
   readonly refreshToken: number
 }
 
@@ -56,11 +49,11 @@ export function ArchiveSections({ t, api, onOpen, onKnownChange, refreshToken }:
   const [armedDelete, setArmedDelete] = useState<string | null>(null)
   const [armedTrashDelete, setArmedTrashDelete] = useState<Set<string>>(new Set())
   const [bulk, setBulk] = useState<null | 'restoreAll' | 'deleteAll'>(null)
-  /** Feedback for the trash-directory copy: the path button flips to "copied" for 2s. */
+
   const trashDirCopy = useCopyFeedback({ feedbackMs: TRASH_DIR_COPY_FEEDBACK_MS })
   const [visible, setVisible] = useState({ archived: SESSION_STREAM_PAGE_SIZE, strays: SESSION_STREAM_PAGE_SIZE, trash: SESSION_STREAM_PAGE_SIZE })
   const [expandedTrash, setExpandedTrash] = useState<Set<string>>(new Set())
-  /** Monotonic request id: an older reload must never overwrite a newer snapshot. */
+
   const reloadSeq = useRef(0)
 
   const reload = useCallback(async (quiet = false): Promise<void> => {
@@ -82,7 +75,7 @@ export function ArchiveSections({ t, api, onOpen, onKnownChange, refreshToken }:
 
   useEffect(() => { void reload() }, [reload, refreshToken])
 
-  /** Keep the report stable for the parent even when its setState identity changes per render. */
+
   const onKnownChangeRef = useRef(onKnownChange)
   onKnownChangeRef.current = onKnownChange
   useEffect(() => {
@@ -90,10 +83,7 @@ export function ArchiveSections({ t, api, onOpen, onKnownChange, refreshToken }:
     onKnownChangeRef.current?.(knownSessionIds(snapshot.tree, snapshot.trash))
   }, [snapshot])
 
-  /**
-   * Optimistically drop a row before the background refresh: the host has already committed the
-   * mutation, so replacing the whole list in one paint is what makes rows "blink".
-   */
+
   const run = useCallback(async (task: () => Promise<unknown>, onDone?: (current: ArchiveSnapshot) => ArchiveSnapshot): Promise<boolean> => {
     setBusy(true)
     setError(null)
@@ -122,7 +112,7 @@ export function ArchiveSections({ t, api, onOpen, onKnownChange, refreshToken }:
     void trashDirCopy.copy(snapshot?.trashDir?.displayPath ?? '')
   }
 
-  /** Remove a subtree by root id from the archived tree, keeping descendants out too. */
+
   const dropFromTree = (id: string) => (current: ArchiveSnapshot): ArchiveSnapshot => ({
     ...current,
     tree: current.tree.filter(node => node.sessionId !== id),

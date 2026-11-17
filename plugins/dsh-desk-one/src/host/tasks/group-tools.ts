@@ -1,7 +1,4 @@
-/**
- * Group tools for the agent surface. Groups are entities (not string labels): they can be empty,
- * renamed, reordered, and moving one to another lane cascades the lane status to its cards.
- */
+
 
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -9,7 +6,7 @@ import { PACKAGE_NAME, TASK_STATUSES } from '../../constants.js'
 import { textOutput, toolError } from '../tools/shared.js'
 import type { DeskStore } from '../store.js'
 
-/** Register the six group tools. */
+
 export function registerGroupTools(ctx: Context, store: DeskStore): void {
   ctx.tools.register(defineTool({
     name: 'desk_group_add',

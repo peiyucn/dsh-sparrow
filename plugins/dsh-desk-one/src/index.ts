@@ -1,4 +1,4 @@
-/** dsh-desk-one entry: host-half contract + reusable pure logic exports. */
+
 export { apply, inject, name } from './host.js'
 export {
   DeskModelError, createNoteRecord, createTaskRecord, filterNotes, filterTasks, normalizeNoteInput, normalizeTaskInput,

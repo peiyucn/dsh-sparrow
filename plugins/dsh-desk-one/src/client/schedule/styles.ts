@@ -1,10 +1,4 @@
-/**
- * Schedule page CSS. Layout contract:
- *  - calendar page = toolbar + upcoming card + calendar card; month/week fill the remaining height
- *  - week grid: 8 hours per screen (inner = 300% of the viewport), anchored on the current time
- *  - sources page replaces the calendar in-panel (management is paged, like the notes trash)
- *  - event detail is a floating card anchored at the click position, closed by outside click / Esc
- */
+
 
 export const SCHEDULE_CSS = `
 .dsh-desk-schedule {

@@ -1,7 +1,4 @@
-/**
- * host HTTP 路由：设置卡片与聊天头部额度卡的状态读取、Key 保存 / 移除、配额查询。
- * Key 只经 ctx.credentials，不进日志与响应；无 Key 零网络行为。
- */
+
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
@@ -14,7 +11,7 @@ import { isTrustedPluginRequest, officialTrustedHosts } from './trust.js'
 const PREFIX = API_PREFIX
 const MAX_BODY_BYTES = 16 * 1024
 
-/** 账号快照（展示用）；enterpriseUserName / nickname 来自 /v2/accounts。 */
+
 export interface AccountView {
   enterpriseName?: string
   accountType?: string
@@ -22,62 +19,62 @@ export interface AccountView {
   nickname?: string
 }
 
-/** 状态接口的模型事实视图（client 头部卡片据此展示当前模型）。 */
+
 export interface ModelFactView {
   id: string
-  /** 服务端原始模型名，不含插件附加标记。 */
+
   name: string
-  /** 积分系数短串（"x0.79"）；服务端未声明时缺省。 */
+
   credits?: string
-  /** 原生视觉（supportsImages）。 */
+
   vision: boolean
   contextWindow: number
-  /** 服务端模型描述（descriptionZh ?? descriptionEn）。 */
+
   description?: string
-  /** 思考档位 id（含 off），无推理能力时缺省。 */
+
   efforts?: string[]
 }
 
-/** web.ts 与 index.ts 共享的最小操作面。 */
+
 export interface CodeBuddyCreditsShared {
   keyConfigured(): Promise<boolean>
   saveKey(key: string): Promise<void>
-  /** 用已存 Key 幂等重配：重拉模型目录与账号信息。 */
+
   reapply(): Promise<void>
-  /** 清空已保存的 Key（凭据 + 模型目录；profile 保留）。 */
+
   removeKey(): Promise<void>
   quota(): Promise<QuotaStatus>
-  /** 会话累计积分与调用次数（从事件重放；冷会话读持久化事件前缀）。 */
+
   sessionUsage(sessionId: string): Promise<TurnUsageView>
-  /** 单轮积分与调用次数（同样来自事件重放）。 */
+
   turnUsage(sessionId: string, turn: number): Promise<TurnUsageView>
-  /** route 是否注册（状态诊断用）。 */
+
   active(): boolean
-  /** 账号快照（来自 /v2/accounts）。 */
+
   account(): AccountView
-  /** 账号缺失时补拉 /v2/accounts（best-effort）。 */
+
   ensureAccount(): Promise<void>
-  /** 模型目录为空时触发节流后台补拉。 */
+
   ensureModels(): Promise<void>
-  /** 手动重扫模型目录：绕过自动冷却、复用上游单飞，只动本 provider。 */
+
   refreshModels(): Promise<{ changed: boolean; models: readonly CodeBuddyModelFacts[] }>
-  /** 进程内当前生效的模型事实。 */
+
   models(): readonly CodeBuddyModelFacts[]
-  /** Max 模式（推理档位锁）当前状态（设置节）。 */
+
   maxMode(): boolean
-  /** 设置 Max 模式（写设置节）。 */
+
   setMaxMode(enabled: boolean): Promise<void>
-  /** 「自适应 API 拦截」开关当前状态（设置节）。 */
+
   autoAdapt(): boolean
-  /** 设置「自适应 API 拦截」开关（写设置节）。 */
+
   setAutoAdapt(enabled: boolean): Promise<void>
 }
 
-/** 积分聚合视图（供轮次 / 会话面板）。 */
+
 export interface TurnUsageView {
   credit: number
   calls: number
-  /** 按模型聚合；顺序 = 首次出现。 */
+
   byModel: ReadonlyArray<{ model: string; credit: number; calls: number }>
 }
 
@@ -104,10 +101,7 @@ function sendJson(res: ServerResponse, status: number, payload: unknown): void {
   res.end(body)
 }
 
-/**
- * 读并解析 JSON 请求体；上限按**字节**而不是字符串长度算 —— `Content-Length` 与内存占用都是字节，
- * 多字节正文按 `.length` 判会把「已超限的请求」当成合法。
- */
+
 async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   let raw = ''
   let bytes = 0
@@ -124,10 +118,7 @@ async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> 
     : {}
 }
 
-/**
- * 读 `{enabled: boolean}` 请求体（/max-mode 与 /auto-adapt 同形）：非法时回 400 并返回 undefined。
- * 返回 undefined 即响应已发出，调用方直接 return。
- */
+
 async function readEnabled(req: IncomingMessage, res: ServerResponse): Promise<boolean | undefined> {
   const body = await readBody(req)
   if (typeof body.enabled !== 'boolean') {
@@ -145,18 +136,18 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
       handler: async (req, res) => {
         const pathname = new URL(req.url ?? '/', 'http://localhost').pathname
         try {
-          // 必须在本路由任何分发与读体之前：本前缀比官方 /api 长（「前缀最长者胜」），请求走不到官方栅栏。
-          // 信任栅栏已覆盖回环与官方 LAN 信任面（webStartup.trustedHosts + webServer 绑定地址），
-          // 故不再额外拒绝非回环 socket —— LAN 部署与 CHANGELOG 0.2.1-rc.2 的承诺一致。
+
+
+
           if (!isTrustedPluginRequest(req.headers, officialTrustedHosts(ctx))) {
             sendJson(res, 403, { error: '拒绝跨站来源的请求' })
             return
           }
-          // 状态接口保持本地毫秒级：不夹带配额请求（额度卡图标依赖它），配额走 /quota。
+
           if (req.method === 'GET' && pathname === PREFIX + '/status') {
             const keyConfigured = await shared.keyConfigured()
             if (keyConfigured) {
-              // 启动补拉失败（网络抖动）时账号 / 模型目录会缺：读取时补一次即自愈。
+
               await shared.ensureAccount().catch(() => {})
               await shared.ensureModels().catch(() => {})
             }
@@ -220,7 +211,7 @@ export function installCodeBuddyWeb(ctx: Context, shared: CodeBuddyCreditsShared
           if (req.method === 'POST' && pathname === PREFIX + '/key') {
             const body = await readBody(req)
             const key = typeof body.key === 'string' ? body.key.trim() : ''
-            // 空 Key = 幂等重配（不输新 Key 的应用路径）。
+
             if (key.length === 0) {
               await shared.reapply()
               sendJson(res, 200, { ok: true })

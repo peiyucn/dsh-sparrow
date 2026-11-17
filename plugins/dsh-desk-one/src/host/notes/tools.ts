@@ -1,7 +1,4 @@
-/**
- * Agent tool surface: shares the same DeskStore as the UI (same objects, same validation);
- * tools return structured JSON plus a human-readable summary so the model can restate it directly.
- */
+
 
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -9,7 +6,7 @@ import { PACKAGE_NAME, NOTE_COLORS } from '../../constants.js'
 import { textOutput, toolError } from '../tools/shared.js'
 import type { DeskStore } from '../store.js'
 
-/** Register the four note tools; the tools share the store with the REST routes, and the UI refreshes on its next fetch. */
+
 export function registerDeskTools(ctx: Context, store: DeskStore): void {
   ctx.tools.register(defineTool({
     name: 'desk_note_add',

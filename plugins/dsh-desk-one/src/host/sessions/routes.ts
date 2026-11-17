@@ -1,7 +1,4 @@
-/**
- * Request validation and dispatch for the 12 REST routes: trust fence → table-driven match → request-level validation → domain module execution → unified error funnel.
- * Business logic lives in the host/ domain modules; this file only cares about HTTP shape and the request / response DTOs in contract.ts.
- */
+
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
@@ -41,7 +38,7 @@ import {
 import { readTitle } from './titles.js'
 import { archiveTreePayload, strayItemsPayload } from './views.js'
 
-/** Host wiring available to a single request. */
+
 interface ArchiveRouteContext {
   readonly ctx: Context
   readonly settings: ArchiveConfig
@@ -52,17 +49,14 @@ interface ArchiveRouteContext {
 
 type RouteHandler = (route: ArchiveRouteContext, req: IncomingMessage, res: ServerResponse) => Promise<void>
 
-/** One row of the desk-one route table (structurally identical to `DeskRouteEntry`). */
+
 export interface SessionRouteEntry {
   readonly method: string
   readonly path: string
   readonly handle: (route: DeskRouteContext, req: IncomingMessage, res: ServerResponse) => Promise<void>
 }
 
-/**
- * Mount the session routes into desk-one's router. The trust fence, 404 handling and error mapping
- * stay in `host/router.ts` + `host/http.ts`; these handlers only own request shapes and domain calls.
- */
+
 export function createSessionRoutes(deps: ArchiveRouteContext): readonly SessionRouteEntry[] {
   return ROUTE_TABLE.map(entry => ({
     method: entry.method,
@@ -71,14 +65,14 @@ export function createSessionRoutes(deps: ArchiveRouteContext): readonly Session
   }))
 }
 
-/** id field in the request body: a non-empty string, otherwise 400. The original value is kept (each route decides whether to trim). */
+
 function requireNonEmptyString(value: unknown, message: string): string {
   if (typeof value !== 'string' || value.trim() === '') throw new SessionsError('BAD_BODY', message)
   return value
 }
 
 async function listRoute(route: ArchiveRouteContext, _req: IncomingMessage, res: ServerResponse): Promise<void> {
-  // /list is the "user opened the panel" signal: run the three startup scans first, then lazily align parent/child state so the first screen shows the cleaned-up result.
+
   route.startup.run()
   await alignChildArchives(route.ctx, route.surface, route.headerFacts)
   const body = await archiveTreePayload(route.ctx, route.headerFacts)
@@ -100,8 +94,8 @@ async function trashDirRoute(route: ArchiveRouteContext, _req: IncomingMessage, 
 }
 
 async function unarchiveRoute(route: ArchiveRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  // Unarchive: only touches the archived set, never files — live sessions (held by dsh) can be unarchived too; idempotent.
-  // Delegated to the official registry (it dispatches workspace/session-unarchiving before removing the id).
+
+
   const parsed = bodyObject<UnarchiveRequest>(await readJsonBody(req), '请求体必须是 JSON 对象')
   const sessionId = SessionId(requireNonEmptyString(parsed.sessionId, 'sessionId 必须是非空字符串'))
   const body = await unarchiveSession(route.ctx, route.headerFacts, sessionId)
@@ -109,9 +103,9 @@ async function unarchiveRoute(route: ArchiveRouteContext, req: IncomingMessage, 
 }
 
 async function archiveRoute(route: ArchiveRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  // Archiving delegates to the official registry API (`workspaceRegistry.archiveSession`): the official write
-  // chain owns the activity gate, pin drop, durability and follow-up admissions (worktree reclamation). Child
-  // sessions of a newly archived parent are mirrored by alignChildArchives on the next domain write event.
+
+
+
   const parsed = bodyObject<ArchiveRequest>(await readJsonBody(req), '请求体必须是 JSON 对象')
   const rootId = requireNonEmptyString(parsed.sessionId, 'sessionId 必须是非空字符串').trim()
   const body = await archiveSession(route.ctx, SessionId(rootId))
@@ -142,7 +136,7 @@ async function sessionTrashOrDeleteRoute(
   if (header === undefined) {
     throw new SessionsError('UNKNOWN_SESSION', '会话持久化中没有这个会话', 404)
   }
-  // Host-truth format gate (request time, before any file operation).
+
   assertHeaderFormatSupported(header)
   const title = await readTitle(ctx, header, header.id)
   const strayBlank = isStray && readStrayBlankness(ctx, String(sessionId))
@@ -192,11 +186,11 @@ async function restoreRoute(route: ArchiveRouteContext, req: IncomingMessage, re
   const trashId = requireNonEmptyString(parsed.trashId, 'trashId 必须是非空字符串')
   const trashDir = resolveTrashDir(route.settings.trashRoot, trashId)
   const sidecar = await restoreTrashDir(route.ctx, route.surface, trashDir)
-  // Restore moves session directories back into persistence: invalidate the header cache immediately so later reads can see them.
+
   route.headerFacts.invalidate()
-  // Projection rows may have been removed by an older startup sweep while in the trash: read the cold logs back and rebuild
-  // through the official coldSnapshot, then emit added with cached projection blocks — so both the input-box @ and task-board @
-  // can show titles / sub-session labels.
+
+
+
   await finalizeRestoredSessions(route.ctx, [
     sidecar.sessionId,
     ...(sidecar.subagents ?? []).map(child => child.sessionId),
@@ -212,8 +206,8 @@ async function restoreAllRoute(route: ArchiveRouteContext, req: IncomingMessage,
   const { body, restoredTreeIds } = await restoreAllTrashItems(route.ctx, route.surface, route.settings.trashRoot)
   route.headerFacts.invalidate()
   sendJson(res, 200, body satisfies TrashRestoreAllResponse)
-  // "Restore all" may restore dozens of entries at once (measured: 43 entries / 139 MB): projection backfill runs in the background after the response,
-  // without blocking the operation; unfinished parts are completed by the next startup repair (see projection-seed.ts).
+
+
   if (restoredTreeIds.length > 0) {
     void finalizeRestoredSessions(route.ctx, restoredTreeIds, PROJECTION_SEED_BACKGROUND_BUDGET_MS).catch((error: unknown) => {
       route.ctx.logger.warn(`${PACKAGE_NAME}: 全部还原后的投影行回填失败：${error instanceof Error ? error.message : String(error)}`)
@@ -230,7 +224,7 @@ async function deleteAllRoute(route: ArchiveRouteContext, req: IncomingMessage, 
   sendJson(res, 200, body satisfies TrashDeleteAllResponse)
 }
 
-/** Route table: method + exact path → handler (`/trash` serves both GET list and POST move-to-trash). */
+
 const ROUTE_TABLE: readonly { readonly method: string; readonly path: string; readonly handle: RouteHandler }[] = [
   { method: 'GET', path: ROUTES.list, handle: listRoute },
   { method: 'GET', path: ROUTES.strays, handle: straysRoute },
@@ -245,4 +239,3 @@ const ROUTE_TABLE: readonly { readonly method: string; readonly path: string; re
   { method: 'POST', path: ROUTES.trashRestoreAll, handle: restoreAllRoute },
   { method: 'POST', path: ROUTES.trashDeleteAll, handle: deleteAllRoute },
 ]
-

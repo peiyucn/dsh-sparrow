@@ -1,4 +1,4 @@
-/** Locale fragment: shell chrome shared by every tab (page copy, tab labels, global state, palette labels). */
+
 
 export const zh = {
   'button.label': '同桌',
@@ -53,7 +53,7 @@ export const zh = {
   'tabs.wishHint': '去 GitHub 提 feature issue，我帮你整理',
 } as const
 
-/** Same keys as `zh`; the `satisfies` keeps the two views in lockstep at compile time. */
+
 export const en = {
   'button.label': 'Desk One',
   'coauthor.entry': 'Talk to Me',

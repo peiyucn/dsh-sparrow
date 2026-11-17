@@ -1,10 +1,10 @@
-/** Draft card rendered in place while a new task is being typed. */
+
 
 import { useRef } from 'react'
 import type { ReactElement } from 'react'
 import type { DeskTranslator } from '../../app/types.js'
 
-/** Inline draft: an empty title cancels instead of creating an empty task (titles are required). */
+
 export function TaskDraftCard({ t, onCommit, onCancel }: {
   readonly t: DeskTranslator
   readonly onCommit: (title: string) => void

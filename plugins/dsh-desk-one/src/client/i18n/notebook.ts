@@ -1,4 +1,4 @@
-/** Locale fragment: notebook page (linked workspace, file list, paging and home copy). */
+
 
 export const zh = {
   'notebook.annotationBadge': '{count} 批注',
@@ -42,7 +42,7 @@ export const zh = {
   'notebook.workspaceLabel': '工作区',
 } as const
 
-/** Same keys as `zh`; the `satisfies` keeps the two views in lockstep at compile time. */
+
 export const en = {
   'notebook.annotationBadge': '{count} annotation(s)',
   'notebook.chooseWorkspace': 'Choose workspace',

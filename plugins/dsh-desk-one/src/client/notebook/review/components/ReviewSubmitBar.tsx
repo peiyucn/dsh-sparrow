@@ -1,7 +1,4 @@
-/**
- * Bottom action bar: two split buttons (submit annotations / this round's changes) with their
- * overlay-opening icon segments. Official primary-button material, no backing strip.
- */
+
 
 import type { ReactElement } from 'react'
 import {
@@ -10,10 +7,10 @@ import {
 import type { DeskTranslator } from '../../../app/types.js'
 import type { OverlayKind } from '../types.js'
 
-/** Delay before the bar tooltips appear. */
+
 const TOOLTIP_DELAY_MS = 400
 
-/** Render the review bottom bar. */
+
 export function ReviewSubmitBar(props: {
   readonly t: DeskTranslator
   readonly annotationCount: number

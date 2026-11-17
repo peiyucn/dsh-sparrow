@@ -1,7 +1,4 @@
-/**
- * Notebook page body: one vertical page with the search field and the official "workspace files"
- * button on top, the four views in the list header, and the paginated list below.
- */
+
 
 import { useState } from 'react'
 import type { ReactElement } from 'react'
@@ -14,7 +11,7 @@ import { DeskGlyph } from '../brand.js'
 import type { ReviewHistoryEntry } from '../../notebook-contract.js'
 import type { NotebookPageController, NotebookRow } from './hooks/useNotebookPage.js'
 
-/** Empty-state copy for the active view. */
+
 function emptyText(page: NotebookPageController): string {
   const t = page.t
   if (page.searching) return t('notebook.searchEmpty')
@@ -26,7 +23,7 @@ function emptyText(page: NotebookPageController): string {
   }
 }
 
-/** Read-only detail of one submitted review record. */
+
 function RecordDialog(props: {
   readonly page: NotebookPageController
   readonly record: ReviewHistoryEntry | null
@@ -104,7 +101,7 @@ function RecordDialog(props: {
   )
 }
 
-/** One compact list row: title, path, facts, optional inline delete. */
+
 function Row({ page, row, onOpen }: {
   readonly page: NotebookPageController
   readonly row: NotebookRow
@@ -149,7 +146,7 @@ function Row({ page, row, onOpen }: {
   )
 }
 
-/** The official "workspace files" entry: one fixed-width white line with the inline Desk One mark. */
+
 function WorkspaceFilesButton({ page }: { readonly page: NotebookPageController }): ReactElement {
   const { t } = page
   return (
@@ -168,7 +165,7 @@ function WorkspaceFilesButton({ page }: { readonly page: NotebookPageController 
   )
 }
 
-/** Unlinked home: the workspace picker is shown by default, not behind a first click. */
+
 function HomeBody({ page }: { readonly page: NotebookPageController }): ReactElement {
   const { t } = page
   return (
@@ -212,7 +209,7 @@ function HomeBody({ page }: { readonly page: NotebookPageController }): ReactEle
   )
 }
 
-/** Linked list card: the head carries the count and the pager, the body the rows. */
+
 function ListCard({ page, onRecord }: {
   readonly page: NotebookPageController
   readonly onRecord: (record: ReviewHistoryEntry) => void
@@ -288,7 +285,7 @@ function ListCard({ page, onRecord }: {
   )
 }
 
-/** Notebook page body. */
+
 export function NotebookView({ page }: { readonly page: NotebookPageController }): ReactElement {
   const { t } = page
   const [record, setRecord] = useState<ReviewHistoryEntry | null>(null)

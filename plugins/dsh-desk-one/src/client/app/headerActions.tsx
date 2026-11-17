@@ -1,7 +1,4 @@
-/**
- * Panel header actions: one builder per tab, kept out of DeskOnePage so the page stays
- * composition-only. Every dependency is passed explicitly -- no hidden state.
- */
+
 
 import type { ReactElement } from 'react'
 import type { DeskTranslator } from './types.js'
@@ -9,7 +6,7 @@ import { archiveIcon, backIcon, plusIcon, smashIcon, sourcesIcon, trashIcon } fr
 import { SortMenu } from '../tasks/components/SortMenu.js'
 import type { TaskSortMode } from '../tasks/types.js'
 
-/** Notes tab: normal wall actions, or the trash sub-page pair. */
+
 export function notesActions(props: {
   readonly t: DeskTranslator
   readonly showTrash: boolean
@@ -89,7 +86,7 @@ export function notesActions(props: {
   )
 }
 
-/** Tasks tab: board actions, or the single back button while the archive sub-page is open. */
+
 export function taskActions(props: {
   readonly t: DeskTranslator
   readonly visible: boolean
@@ -134,12 +131,12 @@ export function taskActions(props: {
   )
 }
 
-/** Schedule tab: settings entry, or the back button while the calendar-settings page is open. */
+
 export function scheduleActions(props: {
   readonly t: DeskTranslator
   readonly visible: boolean
   readonly onSourcesPage: boolean
-  /** Sync-failing sources/calendars; shown as a red badge on the settings entry. */
+
   readonly issueCount: number
   readonly backToCalendar: () => void
   readonly openSources: () => void

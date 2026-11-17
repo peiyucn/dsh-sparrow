@@ -1,28 +1,22 @@
-/**
- * Pure formatting / grouping helpers for the review tab.
- *
- * Keeping these out of the React component makes the user-visible pieces (the annotation batch
- * inserted into the composer, the highlighted line range, the inline-card anchors) testable without
- * a DOM. The batch text is a product contract: `docs/spec/07-notebook.md` documents the exact shape.
- */
+
 
 import type { DraftAnnotation } from '../../../notebook-contract.js'
 
-/** Comment text cap (mirrors the annotation input's maxLength). */
+
 export const REVIEW_COMMENT_MAX_CHARS = 4_000
 
-/** Quote one passage as a markdown blockquote. */
+
 export function quoteBlock(quote: string): string {
   return quote.split('\n').map(line => `> ${line}`).join('\n')
 }
 
-/** One contiguous source-line range, 1-based and inclusive. */
+
 export interface LineRange {
   readonly start: number
   readonly end: number
 }
 
-/** The range the code view highlights: the pending composer target wins over the live selection. */
+
 export function selectedRangeOf(
   composer: { readonly scope: 'selection' | 'document'; readonly startLine?: number; readonly endLine?: number } | null,
   selection: { readonly startLine: number; readonly endLine: number } | null,
@@ -34,12 +28,7 @@ export function selectedRangeOf(
   return selection === null ? undefined : { start: selection.startLine, end: selection.endLine }
 }
 
-/**
- * Group the draft annotations by the source lines they cover. Every covered line is marked in the
- * code view; the inline card itself is rendered on the range's last line (see the code view).
- * @param annotations - the file's draft annotations.
- * @returns line number -> annotations covering that line.
- */
+
 export function annotationsByLine(annotations: readonly DraftAnnotation[]): Map<number, DraftAnnotation[]> {
   const byLine = new Map<number, DraftAnnotation[]>()
   for (const annotation of annotations) {
@@ -53,7 +42,7 @@ export function annotationsByLine(annotations: readonly DraftAnnotation[]): Map<
   return byLine
 }
 
-/** One batch message inserted into the composer: one numbered block per annotation. */
+
 export function annotationMessage(path: string, annotations: readonly DraftAnnotation[]): string {
   return annotations
     .map((annotation, index) => {

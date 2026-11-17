@@ -1,4 +1,4 @@
-/** DTO assembly for the read-only views: GET /list's archive tree and GET /strays's stray-session list. */
+
 
 import { basename } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
@@ -20,7 +20,7 @@ import { readStrayBlankness, sessionFacts } from './projection.js'
 import { sessionDirectoryFromFacts } from './session-files.js'
 import { subagentLabels, titlesFor } from './titles.js'
 
-/** GET /list: the archive parent/child tree (three-tier titles + child-session labels; display facts come from the official projection). */
+
 export async function archiveTreePayload(
   ctx: Context,
   headerFacts: HeaderFactsStore<HeaderFacts>,
@@ -33,12 +33,12 @@ export async function archiveTreePayload(
   const tree = buildSessionTree(archivedHeaders.map(treeHeaderOf))
   const ids = treeIds(tree)
   const workspaceIds = workspaceIndexFor(ctx.workspaceRegistry.list())
-  // Three-tier titles (live projection → cold cache → bounded-collapse fallback); no longer folds every log of the whole tree.
+
   const treeHeaders = ids
     .map(id => byId.get(id))
     .filter((header): header is SessionHeader => header !== undefined)
   const titles = await titlesFor(ctx, treeHeaders, header => header.id)
-  // Child-session labels use the official subagent projection (measured 2026-09-02: for a seed session the title unit resolves to the parent message).
+
   const childHeaders = treeHeaders.filter(header => header.origin === 'subagent')
   const childLabels = childHeaders.length > 0
     ? await subagentLabels(ctx, childHeaders)
@@ -73,7 +73,7 @@ export async function archiveTreePayload(
   return { tree: sortTreeByRecentActivity(tree.map(nodeOf)) }
 }
 
-/** GET /strays: sessions that are neither archived nor attached to any workspace (a child session follows its parent and does not appear separately). */
+
 export async function strayItemsPayload(
   ctx: Context,
   headerFacts: HeaderFactsStore<HeaderFacts>,
@@ -82,15 +82,15 @@ export async function strayItemsPayload(
   const { headers, sizes } = stored
   const archivedIds = await readArchivedIds(ctx)
   const attachedIds = ctx.workspaceRegistry.list().flatMap(workspace => workspace.sessionIds.map(id => String(id)))
-  // A child with a parent follows the parent and is not listed separately as stray; an orphan child (parent absent) is treated as top-level and flagged orphan.
+
   const children = livingChildIds(headers.map(treeHeaderOf))
   const strayIds = straySessionIds(
     headers.map(header => String(header.id)),
     archivedIds.map(id => String(id)),
     attachedIds,
   ).filter(id => !children.has(id))
-  // Collect the stray header set first; titles / child labels resolve in three tiers in batch (cache first + bounded collapse), no longer folding full logs serially per session.
-  // Audit (the O(K·S) at old host.ts :1013): build the membership Set once instead of a linear includes over strayIds per header.
+
+
   const strayIdSet = new Set(strayIds)
   const strayHeaders = headers.filter(header => strayIdSet.has(String(header.id)))
   const titles = await titlesFor(ctx, strayHeaders, header => header.id)

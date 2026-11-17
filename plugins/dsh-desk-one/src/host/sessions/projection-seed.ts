@@ -1,16 +1,4 @@
-/**
- * Cold-session projection row seeding: shared by trash-restore finalization and startup repair.
- *
- * Why it is needed: projection rows are the **only** source of titles / subagent labels in the `@` list (the
- * official `cachedSnapshot` reads only persisted checkpoints and does not fold logs on the fly). Sessions in the
- * trash are not in the persistence list, and historically the startup sweep deleted their rows as stale data;
- * after restore, the input-box `@` degraded to a bare session id and the task-board `@` degraded to the project
- * directory name (observed 2026-11-08: all three restored subagent rows were missing).
- * The fix has two layers: ① the sweep no longer deletes rows for trashed sessions (see projection.ts);
- * ② this module rebuilds missing rows through the official public `coldSnapshot` write-back surface (covering
- * existing data already deleted before the fix), and re-emits `api-session/added` after restore (with a cached
- * projection block), so the client session list shows titles without a refresh.
- */
+
 
 import type { Context } from '@deepseek-ai/cordis'
 import { SessionId, type SessionHeader } from '@deepseek-ai/dsh-session'
@@ -26,20 +14,15 @@ import { emitSessionAdded } from './archive-set.js'
 import type { HeaderFacts } from './headers.js'
 import { cachedSnapshotOf, canWriteProjectionCache, coldSnapshotOf, readStrayBlankness, summaryBlockOf, type ProjectionBlock } from './projection.js'
 
-/** Facts immediately available after seeding one session (source for the added notification payload). */
+
 interface SessionProjectionFacts {
   readonly header: SessionHeader
   readonly blank: boolean
-  /** Official cached projection block; absent means the cache service is unavailable / seeding failed, so the
-   *  added notification can add the entry but not the title. */
+
   readonly projections?: ProjectionBlock
 }
 
-/**
- * Whether a cached row lacks a unit the `@` list needs: the title (without label it degrades to the session id),
- * and, for subagent sessions, the subagent label unit (without composer's displayTitle it degrades to the session
- * id). A row that exists but lacks a unit still needs seeding.
- */
+
 function needsProjectionSeed(header: SessionHeader, block: ProjectionBlock | undefined): boolean {
   if (block === undefined) return true
   const title = block.values.title
@@ -47,7 +30,7 @@ function needsProjectionSeed(header: SessionHeader, block: ProjectionBlock | und
   return header.origin === 'subagent' && block.values.subagent === undefined
 }
 
-/** Projection values → blank determination (same criteria as parseBlankProjection: sessionListMetadata.blank or turns === 0). */
+
 function blankOf(ctx: Context, sessionId: string, block: ProjectionBlock | undefined): boolean {
   if (block !== undefined) {
     const metadata = block.values.sessionListMetadata as { readonly blank?: unknown } | undefined
@@ -58,21 +41,12 @@ function blankOf(ctx: Context, sessionId: string, block: ProjectionBlock | undef
   return readStrayBlankness(ctx, sessionId)
 }
 
-/** Fallback when seeding fails: keep the existing cached block (possibly empty) so a derived-data failure does
- *  not affect the main restore flow. */
+
 function degraded(header: SessionHeader, projections: ProjectionBlock | undefined, blank: boolean): SessionProjectionFacts {
   return { header, blank, ...projections === undefined ? {} : { projections } }
 }
 
-/**
- * Seed one session: when its row is already usable, do not read the log; when the row is missing / incomplete,
- * read the full cold log and write back through the official `coldSnapshot`.
- * Any failure only logs a warning and degrades; nothing is thrown to the caller.
- * @param ctx - Host context.
- * @param id - Session id.
- * @param signal - Abort signal for the batch budget.
- * @returns Seeded facts; undefined when the session is not in persistence / even the header cannot be obtained.
- */
+
 async function seedOneSession(
   ctx: Context,
   id: string,
@@ -95,8 +69,8 @@ async function seedOneSession(
   if (!needsProjectionSeed(header, cached)) {
     return { header, blank: blankOf(ctx, id, cached), projections: cachedProjections }
   }
-  // The cache service has no write-back surface at all: reading a log would not write anything, so degrade
-  // immediately — avoid folding a large log for every session for nothing.
+
+
   if (!canWriteProjectionCache(ctx)) {
     ctx.logger.warn(`${PACKAGE_NAME}: 宿主未提供可识别的 coldSnapshot，跳过投影行回填（${id}）`)
     return degraded(header, cachedProjections, blankOf(ctx, id, cached))
@@ -118,14 +92,7 @@ async function seedOneSession(
   return { header: log.header, blank: blankOf(ctx, id, seeded), projections: summaryBlockOf(ctx, seeded) }
 }
 
-/**
- * Seed projection rows in batches (bounded concurrency + batch budget).
- * @param ctx - Host context.
- * @param sessionIds - Session ids to seed (deduplicated, input order preserved).
- * @param budgetMs - Batch budget; unfinished items after timeout are treated as failed, leaving the rest for the
- * next startup repair.
- * @returns Facts for sessions whose headers were obtained (in input order).
- */
+
 export async function seedSessionProjections(
   ctx: Context,
   sessionIds: readonly string[],
@@ -150,17 +117,7 @@ export async function seedSessionProjections(
   }
 }
 
-/**
- * Restore finalization: seed projection rows and re-emit `api-session/added` in input order "root → children".
- *
- * Restored sessions are still archived (trash entries came from the archived set), so added only makes the
- * client session list hold them again (removed was emitted when they entered the trash); archived state is
- * determined by the workspace snapshot. The cached projection block is included so titles / subagent labels are
- * immediately available — that is why the two `@` lists agree.
- * @param ctx - Host context.
- * @param sessionIds - Restored session ids (roots first, children after).
- * @param budgetMs - Seeding budget.
- */
+
 export async function finalizeRestoredSessions(
   ctx: Context,
   sessionIds: readonly string[],
@@ -178,22 +135,13 @@ export async function finalizeRestoredSessions(
   }
 }
 
-/**
- * Startup repair: seed projection rows for cold sessions in the persistence list that lack them (covering stock
- * data swept away while in the trash before the fix).
- *
- * Only non-live sessions are handled (live sessions use the projection registry snapshot and do not need cached
- * rows); logs are read only for sessions that genuinely lack a row, so on a healthy machine this is a zero-I/O
- * walk. After seeding, added is emitted so connected pages recover titles without a refresh.
- * @param ctx - Host context.
- * @param headerFacts - Header facts cache (persistence list, prewarmed by the startup sweep).
- */
+
 export async function healMissingSessionProjections(
   ctx: Context,
   headerFacts: HeaderFactsStore<HeaderFacts>,
 ): Promise<void> {
-  // No official write-back surface: seeding cannot succeed, so do not read logs for every cold session for
-  // nothing (old hosts / when the service is not mounted).
+
+
   if (!canWriteProjectionCache(ctx)) return
   try {
     const { headers } = await headerFacts.get()

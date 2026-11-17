@@ -1,4 +1,4 @@
-/** Browser-side task/group data plane: host REST routes only. */
+
 
 import { ROUTES } from '../../constants.js'
 import type {
@@ -8,7 +8,7 @@ import type {
 } from '../../contract.js'
 import { fetchJson, postJson } from '../http.js'
 
-/** Load the whole board (archived tasks included; the view filters). */
+
 export function listTasks(): Promise<readonly DeskTask[]> {
   return fetchJson<TaskListResponse>(`${ROUTES.tasks}?include_archived=1`).then(payload => payload.tasks)
 }
@@ -61,7 +61,7 @@ export function deleteGroup(id: string): Promise<void> {
   return postJson<TaskGroupDeleteResponse>(ROUTES.groupDelete, { id }).then(() => undefined)
 }
 
-/** Archive / restore a whole group (host archives its cards too). */
+
 export function archiveGroup(input: {
   readonly id: string
   readonly expectedRevision: number

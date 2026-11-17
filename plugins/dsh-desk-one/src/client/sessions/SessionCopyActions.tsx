@@ -1,8 +1,4 @@
-/**
- * Copy actions shared by every session row (active, archived, stray, trash): one button copies the
- * display name, one the opaque Session id. Feedback stays on the button itself (success check, or a
- * failure label when the host rejects the clipboard write), so rows need no toast.
- */
+
 
 import type { ReactElement } from 'react'
 import {
@@ -40,7 +36,7 @@ function CopyButton(props: {
   )
 }
 
-/** Name + id copy buttons for one session row. */
+
 export function SessionCopyActions({ title, sessionId, t }: {
   readonly title: string
   readonly sessionId: string

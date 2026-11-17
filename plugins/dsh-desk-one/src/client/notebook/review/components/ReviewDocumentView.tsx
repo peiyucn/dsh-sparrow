@@ -1,7 +1,4 @@
-/**
- * Read-only rendered view: rendered markdown plus the frontmatter fields shown as a field list before
- * the body (matching the official markdown preview).
- */
+
 
 import type { ReactElement } from 'react'
 import { MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -9,7 +6,7 @@ import type { MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { NotebookPageResponse } from '../../../../notebook-contract.js'
 import type { DeskTranslator } from '../../../app/types.js'
 
-/** Render the read-only document view. */
+
 export function ReviewDocumentView(props: {
   readonly t: DeskTranslator
   readonly page: NotebookPageResponse

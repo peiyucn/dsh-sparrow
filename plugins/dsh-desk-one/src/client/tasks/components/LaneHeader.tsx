@@ -1,4 +1,4 @@
-/** Lane header: column title, count and the lane-scoped add / group buttons. */
+
 
 import type { ReactElement } from 'react'
 import type { TaskStatus } from '../../../contract.js'
@@ -15,7 +15,7 @@ interface LaneHeaderProps {
   readonly onBeginGroup: () => void
 }
 
-/** Fixed lane header: title + count, plus add / group actions on the right. */
+
 export function LaneHeader({
   status, title, countLabel, compact, t, onAdd, onBeginGroup,
 }: LaneHeaderProps): ReactElement {

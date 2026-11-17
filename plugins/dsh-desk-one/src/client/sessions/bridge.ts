@@ -1,10 +1,4 @@
-/**
- * Session-link bridge: reads the host's public client services (`sessions`, `workspaces`,
- * `uiWorkspace`) through an optional dependency fork and exposes one stable facade to the page.
- *
- * The services are typed structurally on purpose: they live in other official packages and the
- * plugin only relies on the small, documented snapshot/navigation surface used by ui-schedule.
- */
+
 
 import type { SessionChipInfo, SessionLinkApi, SessionLinkSnapshot } from './contract.js'
 
@@ -16,11 +10,11 @@ interface TokenUsageLike {
 }
 
 interface SessionProjectionValuesLike {
-  /** Official `subagent` projection view value (summary key); label identifies the child. */
+
   readonly subagent?: { readonly label?: string } | null
-  /** Provider-reported usage; a summary projection already present on list rows. */
+
   readonly tokenUsage?: TokenUsageLike | null
-  /** Full-projection stats read on demand (excluded from list summaries). */
+
   readonly sessionStats?: {
     readonly turns?: number
     readonly steps?: number
@@ -54,7 +48,7 @@ interface SessionsServiceLike {
     getSnapshot: () => SessionListStateLike
     subscribe: (listener: () => void) => () => void
   }
-  /** Official public read: load full projections without opening a Session. */
+
   readonly refreshProjections?: (sessionId: string) => Promise<void>
 }
 
@@ -75,7 +69,7 @@ interface WorkspaceStateLike {
 interface WorkspacesServiceLike {
   readonly list: {
     getSnapshot: () => WorkspaceStateLike
-    /** Optional for older hosts: archive changes must wake the picker when available. */
+
     subscribe?: (listener: () => void) => () => void
   }
 }
@@ -84,7 +78,7 @@ interface UiWorkspaceLike {
   openSession: (sessionId: string) => void
 }
 
-/** Structural view of the client context used by the optional fork. */
+
 export interface SessionServices {
   readonly sessions: SessionsServiceLike
   readonly workspaces: WorkspacesServiceLike
@@ -93,16 +87,11 @@ export interface SessionServices {
 
 interface SessionLinkBridge {
   readonly api: SessionLinkApi
-  /** Attach to live services; returns a detach that restores the disabled facade. */
+
   attach: (services: SessionServices) => () => void
 }
 
-/**
- * Display label for one client session row, aligned with the composer's `@` labels:
- * - subagent sessions use the `subagent` label first (composer shows `displayTitle`, whose
- *   subagent branch is the label); the durable title is only a fallback;
- * - ordinary sessions use the durable title, never the cwd-basename `displayTitle`.
- */
+
 function chipTitle(row: SessionRowLike | undefined, id: string): string {
   if (row === undefined) return id
   if (row.origin === 'subagent') {
@@ -147,7 +136,7 @@ function resolveSnapshot(services: SessionServices | null): SessionLinkSnapshot 
       ...typeof tokens?.cacheWriteTokens === 'number' ? { cacheWriteTokens: tokens.cacheWriteTokens } : {},
     }
   })
-  // Running sessions first, then most recently updated — the picker's default order.
+
   sessions.sort((left, right) =>
     Number(right.running) - Number(left.running)
     || right.updatedAt - left.updatedAt
@@ -169,8 +158,8 @@ export function createSessionLinkBridge(): SessionLinkBridge {
   const attach = (next: SessionServices): (() => void) => {
     services = next
     const unsubscribeSessions = next.sessions.list.subscribe(emit)
-    // Archive/unarchive changes land on the workspace store, not the session list: without this
-    // subscription a restored session would keep the stale status until a full page reload.
+
+
     const unsubscribeWorkspaces = next.workspaces.list.subscribe?.(emit)
     emit()
     return () => {
@@ -198,7 +187,7 @@ export function createSessionLinkBridge(): SessionLinkBridge {
       try {
         await refresh.call(services?.sessions, sessionId)
       } catch {
-        // Stats are progressive enhancement: the preview still shows list metadata without them.
+
       }
     },
   }

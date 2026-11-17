@@ -1,10 +1,4 @@
-/**
- * Notebook page styles: layout only.
- *
- * The page is one fixed-height screen: the header-owned actions sit in the panel top bar, the body
- * is a toolbar plus an internally scrolling, paginated list. Rows follow the session list's compact
- * single-line geometry so the two tabs read as one product. Every value is an official theme alias.
- */
+
 
 export const NOTEBOOK_CSS = `
 /* --- fixed page shell ---------------------------------------------------- */

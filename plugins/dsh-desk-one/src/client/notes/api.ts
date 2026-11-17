@@ -1,4 +1,4 @@
-/** Browser-side data surface: goes only through the host's own REST routes (the client never touches storage directly). */
+
 
 import { ROUTES } from '../../constants.js'
 import type { DeskNote, NoteDeleteResponse, NoteListResponse, NoteMutationResponse } from '../../contract.js'
