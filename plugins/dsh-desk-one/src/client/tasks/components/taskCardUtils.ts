@@ -1,4 +1,4 @@
-
+import type { SessionChipInfo } from '../../sessions/contract.js'
 
 
 function localToday(): Date {
@@ -18,4 +18,8 @@ export function autoGrow(element: HTMLTextAreaElement | null): void {
   if (element === null) return
   element.style.height = 'auto'
   element.style.height = `${element.scrollHeight}px`
+}
+
+export function hasRunningSession(chips: readonly SessionChipInfo[]): boolean {
+  return chips.some(chip => chip.availability === 'available' && chip.running)
 }

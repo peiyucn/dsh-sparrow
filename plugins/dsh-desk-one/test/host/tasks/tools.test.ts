@@ -16,6 +16,9 @@ type FakeTask = {
   title: string
   revision: number
   sessionIds: string[]
+  status?: string
+  archived?: boolean
+  groupId?: string
 }
 
 type FakeUpdate = {
@@ -56,6 +59,13 @@ function updateTool(store: unknown) {
   const tools = collectTools(registerTaskTools, store) as unknown as Tool[]
   const tool = tools.find(candidate => candidate.name === 'desk_task_update')
   if (tool === undefined) throw new Error('desk_task_update 未注册')
+  return tool
+}
+
+function listTool(store: unknown) {
+  const tools = collectTools(registerTaskTools, store) as unknown as Tool[]
+  const tool = tools.find(candidate => candidate.name === 'desk_task_list')
+  if (tool === undefined) throw new Error('desk_task_list 未注册')
   return tool
 }
 
@@ -164,5 +174,51 @@ describe('desk_task_update 已有任务补挂会话', () => {
     await tool.execute({ id: 'task_1', expected_revision: 4, title: '新标题' }, { agent: { id: 'session-b' } })
     assert.equal(store.updates[0].patch.title, '新标题')
     assert.equal(store.updates[0].patch.sessionIds, undefined)
+  })
+})
+
+describe('desk_task_list 当前会话过滤', () => {
+  const tasks: FakeTask[] = [
+    { id: 'task_1', title: '本会话任务', revision: 1, sessionIds: ['session-1'], status: 'todo' },
+    { id: 'task_2', title: '别的会话任务', revision: 1, sessionIds: ['session-2'], status: 'todo' },
+    { id: 'task_3', title: '没有会话', revision: 1, sessionIds: [], status: 'doing' },
+  ]
+
+  it('linked_to_current_session 只返回当前会话挂的任务', async () => {
+    const tool = listTool(fakeStore(tasks))
+    const output = JSON.parse(String(await tool.execute(
+      { linked_to_current_session: true },
+      { agent: { id: 'session-1' } },
+    ))) as { total: number; tasks: FakeTask[] }
+    assert.equal(output.total, 1)
+    assert.deepEqual(output.tasks.map(task => task.id), ['task_1'])
+  })
+
+  it('linked_to_current_session 可与状态 / 关键词组合', async () => {
+    const tool = listTool(fakeStore(tasks))
+    const output = JSON.parse(String(await tool.execute(
+      { linked_to_current_session: true, status: 'doing' },
+      { agent: { id: 'session-1' } },
+    ))) as { total: number }
+    assert.equal(output.total, 0)
+    const byQuery = JSON.parse(String(await tool.execute(
+      { linked_to_current_session: true, query: '本会话' },
+      { agent: { id: 'session-1' } },
+    ))) as { total: number }
+    assert.equal(byQuery.total, 1)
+  })
+
+  it('缺少 agent 上下文时拒绝按当前会话过滤', async () => {
+    const tool = listTool(fakeStore(tasks))
+    await assert.rejects(
+      () => tool.execute({ linked_to_current_session: true }, {}),
+      /没有会话上下文/u,
+    )
+  })
+
+  it('不传 linked_to_current_session 时保持原行为', async () => {
+    const tool = listTool(fakeStore(tasks))
+    const output = JSON.parse(String(await tool.execute({}, { agent: { id: 'session-1' } }))) as { total: number }
+    assert.equal(output.total, 3)
   })
 })

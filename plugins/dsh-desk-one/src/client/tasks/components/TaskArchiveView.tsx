@@ -13,6 +13,7 @@ interface TaskArchiveViewProps {
   readonly groups: readonly DeskTaskGroup[]
   readonly t: DeskTranslator
   readonly countText: (count: number) => string
+  readonly runningTaskIds: ReadonlySet<string>
   readonly onRestoreGroup: (group: DeskTaskGroup) => void
   readonly onDeleteGroup: (group: DeskTaskGroup) => void
   readonly onRestoreTask: (task: DeskTask) => void
@@ -74,16 +75,17 @@ function GroupArchiveRow({
 
 
 function ArchiveRow({
-  task, t, onRestore, onDelete,
+  task, running, t, onRestore, onDelete,
 }: {
   readonly task: DeskTask
+  readonly running: boolean
   readonly t: DeskTranslator
   readonly onRestore: (task: DeskTask) => void
   readonly onDelete: (id: string) => void
 }): ReactElement {
   const [confirm, setConfirm] = useState(false)
   return (
-    <li className="dsh-task-archive-row">
+    <li className="dsh-task-archive-row" data-color={task.color} data-running={running ? 'true' : undefined}>
       <span className="dsh-task-archive-dot" data-color={task.color} />
       <span className="dsh-task-archive-title">{task.title}</span>
       <span className="dsh-task-archive-lane">{t(LANE_LABEL_KEY[task.status])}</span>
@@ -121,7 +123,7 @@ function ArchiveRow({
 
 
 export function TaskArchiveView({
-  tasks, groups, t, countText, onRestoreGroup, onDeleteGroup, onRestoreTask, onDeleteTask,
+  tasks, groups, t, countText, runningTaskIds, onRestoreGroup, onDeleteGroup, onRestoreTask, onDeleteTask,
 }: TaskArchiveViewProps): ReactElement {
   return (
     <div className="dsh-task-archive">
@@ -147,6 +149,7 @@ export function TaskArchiveView({
                 <ArchiveRow
                   key={task.id}
                   task={task}
+                  running={runningTaskIds.has(task.id)}
                   t={t}
                   onRestore={onRestoreTask}
                   onDelete={onDeleteTask}
