@@ -34,7 +34,7 @@ Desk One 的任务板已经能挂会话（任务卡显示会话 chip，可跳回
 | `src/host/skill.ts` | `desk-one` skill 里的“新会话任务捕获”小节：触发边界（首轮 / 可跟踪事项 / 拒绝后不再问 / 纯问答不问）+ 同意后的建卡流程、标题 / 状态 / body 规则 |
 | `src/host/tasks/tools.ts` | `desk_task_add` 新增 `link_current_session`；从工具上下文的 agent id 取当前会话 |
 
-**Phase 2（暂缓）**：如果真实新会话里 skill 没有被加载、不会主动问，再加一段很短的常驻 system prompt section 作为触发层；本轮不注册。
+**Phase 2（已决策，spec 12，待实现）**：owner 已确认要加常驻 system prompt 作为触发层；具体触发边界、先问后建、已有任务补挂与去重见 `12-auto-task-capture-prompt.md`。本轮不注册，等 spec 评审通过后实现。
 
 ## 数据与边界
 
