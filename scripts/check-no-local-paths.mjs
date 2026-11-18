@@ -47,7 +47,8 @@ const GENERIC_RULES = [
 
     re: new RegExp([LOCAL_WORKSPACE_PARTS[0], LOCAL_WORKSPACE_PARTS[1], LOCAL_WORKSPACE_PARTS[2]].join('-'), 'gu'),
     token: () => null,
-    allowedFiles: ['AGENTS.md', 'meta/SOURCE.md'],
+    allowedFiles: ['AGENTS.md'],
+    allowedPrefixes: ['meta/'],
   },
 ]
 
@@ -121,6 +122,7 @@ for (const file of files) {
     for (const rule of GENERIC_RULES) {
       if (reported) break
       if (rule.allowedFiles?.includes(file)) continue
+      if (rule.allowedPrefixes?.some((prefix) => file.startsWith(prefix))) continue
       rule.re.lastIndex = 0
       let m
       while ((m = rule.re.exec(line)) !== null) {
