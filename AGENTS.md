@@ -156,13 +156,13 @@ DeepSeek Harness（DSH）Web 插件合集，每个插件独立 npm 包、独立�
 - **测试侧类型检查**：每个插件 `tsconfig.test.json` 检查 `test/**/*.ts`；根 `tsconfig.test.json` 检查根 `test/**/*.ts`（QG 负例）。测试全部是 `.ts`，Node 24 原生剥类型运行。
 - **纯逻辑目录**：`plugins/dsh-desk-one/src/model`（L003）。项目 ESLint 配置为 `meta/lint/project-eslint.mjs`，根目录无 `eslint.config.mjs`（L007）。
 - **CI（`.github/workflows/ci.yml`）**：`typecheck` → `build` → `test` → `package`（E24）。`typecheck` job 先跑 `pnpm run lint`、`test:policy`、`typecheck:policy`，再 `typecheck:all`；`test` job 上传 JUnit artifact。
-- **required checks**：`typecheck`、`build`、`test`、`package`（F5 / E24）。仓库 ruleset 与 required checks 由 owner 在 GitHub 配置并核验；本仓库当前只有两条轻保护 ruleset，严格 PR 门禁与 tag ruleset 尚未配置。
+- **required checks**：`typecheck`、`build`、`test`、`package`（F5 / E24）。已配置（2026-11-18）：严格 PR 门禁 ruleset 覆盖 `main` / `dev`，required checks 四项、strict 策略开启、owner bypass = `pull_request`；发布 tag 保护 ruleset 覆盖 `refs/tags/*-v*`、owner bypass = `always`；默认分支与 `dev` 各一条轻保护 ruleset；合并设置 squash-only、合并后删除分支。
 - **发布（`.github/workflows/publish.yml`）**：environment `npm-publish`；tag `<插件名>-vX.Y.Z`；tag 提交须在 `main`；发布前跑 `pnpm run lint` 与插件 `npm run verify`；E18 安全门禁用 `SECURITY_ALERTS_TOKEN`，在 `npm publish` 前 fail-closed；promote 手动任务只允许 `latest` / `next`；不建 GitHub Release。
 - **部署**：`.github/workflows/market.yml` 的 `deploy` job 发布 `dsh.pyai.site`（environment `github-pages`）。
 - **打包产物（E9）**：npm 包内容由各插件 `package.json` 的 `files` 决定（`lib/**`、`cordis.patch.yml`、中英 README / CHANGELOG）；`lib/` 是构建产物、不进 git；仓库不保留 `releases/`。
-- **安全基线（F4）核验记录**：2026-11-18 以 agent 身份只读查询：private vulnerability reporting 已开启；`npm-publish` 与 `github-pages` environment 存在；现有 ruleset 仅「默认分支轻保护」「dev 分支轻保护」两条；`.github/CODEOWNERS` 此前缺失，本次已补。Dependabot / Code scanning / Secret scanning 告警数、CodeQL default setup、合并设置因 agent token 无对应权限记「未查到」，由 owner 核验；严格 PR 门禁 ruleset、tag ruleset、required checks 属 owner 动作，尚未配置。
+- **安全基线（F4）核验记录**：2026-11-18 以 owner 身份只读核验：Dependabot alerts / Code scanning / Secret scanning 未处理告警均为 0；CodeQL default setup 已配置（actions、javascript、javascript-typescript、typescript，weekly）；secret scanning + push protection 已开启，非提供商模式与 validity checks 关闭；Dependabot 自动升级关闭；private vulnerability reporting 已开启；`npm-publish` 与 `github-pages` environment 存在；`main` 经典保护为「要求对话解决 + 不允许绕过」且不设 required checks；`.github/CODEOWNERS` 已入库。严格 PR 门禁与发布 tag 保护 ruleset 见上一节的配置记录。
 - **GitHub / 网络**：agent 的 API / PR 用 `gh-agent`，push 用 `git-agent`；`gh` 只用于 owner / Forge 动作；不手拼 git URL、不写明文凭据；需要代理时显式指定，不写配置文件。
-- **路径守卫例外**：`AGENTS.md` 的继承头与 `meta/SOURCE.md` 的来源行必须写 meta-repo 名称，`check:paths` 仅对这两个文件放行 workspace 名；其它文件仍禁止本机绝对路径 / 用户名。
+- **路径守卫例外**：`AGENTS.md` 的继承头与 `meta/` 本地快照（含 `SOURCE.md` 与共享规则里的继承引用）必须写 meta-repo 名称；`check:paths` 的 workspace 名规则只扫项目自有文件，其它文件仍禁止本机绝对路径 / 用户名。
 - **管线登记**：项目管线在 meta-repo 的 [meta/rules/engineering.md](meta/rules/engineering.md) 子项目对照与本仓库 README 项目清单，不在此重复。
 
 ## 4. 改写
