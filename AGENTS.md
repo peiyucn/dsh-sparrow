@@ -97,7 +97,7 @@ DeepSeek Harness（DSH）Web 插件合集，每个插件独立 npm 包、独立�
   - `inject` 只放跨版本稳定存在的服务；易变面（如设置读取面 `settingsScope` → `configForms`）走 `ctx.inject([...], cb)` 起的可选依赖 fork：服务出现才装，这条宿主线没有就什么都不做；fork 是 entry 的子 fiber，不进审计的 entry 列表。
   - 依据（实测）：dsh 0.1.7-alpha.1 `packages/client/web/src/boot-client.ts:63-82`。
 - **组合行**：`cordis.patch.yml` insert 按官方 bundle patch 规范——`id` 用短名，`name` 用 scoped 包名。
-- **版本门：包 manifest 只声明 peer，派生处才写 `engines.dsh`**：官方 0.2.1-alpha.4 起，插件 `package.json` 一旦声明 `engines.dsh`，安装 / 启动的兼容性只按该 range 判定、`peerDependencies` 被忽略（`@deepseek-ai/dsh-app-boot` 的 `plugin-compatibility.ts`；`workspace:` 形式在该 range 里视为不兼容）。故包 manifest 不写 `engines.dsh`，`check:dsh-pin` 判据 5 会拒绝；派生处（当前 = `market/index.json`）的 `engines.dsh` 一律由 peer 机械派生、不得手写：取该版本 `@deepseek-ai/dsh` 与 `@deepseek-ai/dsh-*` 的 peer range，跳过 `workspace:` 值，多个 range 用空格连接（semver 的 AND），全为 `*` 时省略；`check:market-index` 校验派生值。
+- **版本门：peer 写兼容范围，devDeps / overrides 写精确最新 rc**：官方 0.2.1-alpha.4 起，插件 `package.json` 一旦声明 `engines.dsh`，安装 / 启动的兼容性只按该 range 判定、`peerDependencies` 被忽略（`@deepseek-ai/dsh-app-boot` 的 `plugin-compatibility.ts`；`workspace:` 形式在该 range 里视为不兼容）。故包 manifest 不写 `engines.dsh`；`peerDependencies` 的 `@deepseek-ai/dsh*` 统一写当前支持线 `>=0.2.2-rc.3 <0.2.3`（0.2.2 线），`devDependencies` / `pnpm-workspace.yaml` 的 overrides 与 `minimumReleaseAgeExclude` 统一写精确最新 rc（当前 `0.2.2-rc.5`）。`check:dsh-pin` 校验 peer 单一范围、dev / overrides 单一精确版本、README 环境行写同一范围。官方发新 rc 时只 bump devDeps / overrides 并跑 verify；绿则不必然发版，红才适配并调整范围或下限。派生处（当前 = `market/index.json`）的 `engines.dsh` 一律由 peer range 机械派生、不得手写；`check:market-index` 校验派生值。
 - **seam 纪律（三档）**：① 正路：只用公开 seam（`ctx.llm` / `ctx.webServer` / `ctx.tools` / slots / provide 等）；② 包装：公开 seam 不满足需求时包装它——保持原签名与 `this` 语义、可逆恢复，并记录适配的 dsh 版本；③ 私有 seam 依赖：官方无公开能力时允许调 private 方法 / 读写 private 状态；护栏是不替换 / 不包装 / 不覆写官方函数，优先复用官方自身写入路径，启动时能力检查、surface 变化即 fail-fast，且须 owner 批准并记入 `docs/private-seams.md`。
 - **禁止**：monkey-patch 核心、硬编码 dsh 内部目录布局、绕过服务契约直读内部文件（特例须记入 `docs/private-seams.md` + owner 认可）。
 - **查证原则**：引用 DSH 服务 / 事件 / 插槽契约前先 grep 官方源码（本机 checkout：`~/.dsh-launcher-panel/source`，可用 `DSH_SOURCE` 覆盖），禁止凭记忆编造。
@@ -133,11 +133,11 @@ DeepSeek Harness（DSH）Web 插件合集，每个插件独立 npm 包、独立�
 
 - **范围**：只发有改动的插件——对比 `npm view <包名> version`、插件 `package.json` version、自上次 tag 的 git log。
 - **元数据**：name 必须 `@dsh-sparrow/<插件名>`；description 英文；`repository` 必填（`--provenance` 校验）；`files` 清单齐备；README / CHANGELOG 中英双份顶部互链；CHANGELOG 条目按发布顺序从上到下、稳定版覆盖 alpha 全部改动、只记真实发布过的版本；截图统一放仓库根 `resources/dsh-<插件名>.png`（不打包进 npm 包），README 用绝对 URL 引用。
-- **版本线镜像官方 dsh**：官方什么版本我们同形；只承诺版本号所标示的那一条线，README 环境要求写确切版本线，禁止写 `>=`；官方未发新版时的自家迭代用预发布尾段递增（`0.1.2-rc.1.1`、`.2`…）。
+- **版本线**：插件版本号仍与官方线同形（本轮 rc.5）；README 环境要求写**支持范围**，不写单一精确版本；官方未发新版时的自家迭代用预发布尾段递增。发布版本号不必然跟随每个官方 rc，只有代码或支持范围变化才需要发版。
 - **各插件版本线独立**：哪个插件有改动发哪个；根 `package.json` version = 合集整体版本，只在整体升级时动。
-- **通道跟随官方宿主**：按插件钉住的官方 dsh 版本所在 dist-tag 选通道——官方 `latest` → `latest`；只在官方 `next` → `next`；两个都不是或查询失败时回退版本后缀规则（alpha / beta → `next`，rc 与纯数字稳定版 → `latest`）。判定在 `publish.yml` 的「Resolve plugin, version, and npm dist-tag」步骤。
+- **通道：owner 决定，`next` 与 `latest` 都发**：发布工作流先按版本选一个通道发 `next`；owner 本地验证后，用 promote 步骤把**同一版本号**移到 `latest`（不重复发 tarball）。不再只跟随官方 dist-tag；官方 `latest` 滞后也照常发 `latest`。
 - **owner 的 web profile 固定 `link:`** 直连本仓库插件目录；profile 级 `cordis.patch.yml` 保持 `[]`（插件经各插件 `package.json` 的 `dsh.profile.bundles` 装载，重复 insert 会 `duplicate loader entry id`）。
-- **官方版本跟随**：不硬跟每个官方预发布；rc 线内对齐官方最新；影响预判记 `docs/upstream/`；dsh 升级 = 正式适配任务。
+- **官方版本跟随**：不硬跟每个官方预发布；新 rc 先 bump devDeps / overrides 并跑 verify，影响预判记 `docs/upstream/`；只有代码或支持范围变化才需要发版。dsh 升级仍是正式适配任务。
 - **发布确认（硬门禁，owner 当次点头）**：`git tag` / `npm publish` 等不可逆的对外发布动作，执行前必须由 owner 当次明确确认；「之前批准了整条发布流程」「按你建议走」「继续」不构成发布许可；agent 停在 push tag 之前，一句话报出要发哪个插件、版本号、目标通道、影响范围，未回话即视为未批准。
 - **流程**：改动 push dev + 插件 verify → 版本号 + CHANGELOG 双份 → 再 verify + `git diff --check` → dev→main（ff）并 push → `git tag -a <插件名>-vX.Y.Z -F <说明文件>`（说明用 `node scripts/tag-notes.mjs <插件名> <版本号>` 生成；Windows 先输出到文件再 `-F`）→ 逐个 push tag → 盯 Publish success + `npm view` 复核版本与 dist-tag → 切回 dev。版本号编辑只动该插件自己的 `package.json`。
 - **tag 兜底**：GitHub 一次推超过三个 tag 时不生成 push 事件——逐个推（或每批 ≤3 个），推完 30 秒内查 Publish run，没有就 `gh workflow run publish.yml -f plugin=<插件名>` 手动派发（本仓库不建 GitHub Release）。

@@ -35,13 +35,13 @@ describe('文档契约', () => {
     }
   })
 
-  it('README 应该顶部互链，并写明当前版本与钉住的 DSH 版本线', async () => {
+  it('README 应该顶部互链，并写明当前版本与支持的 DSH 范围', async () => {
     const pkg = await readJson('package.json')
-    const pins = [...new Set(Object.entries(pkg.peerDependencies)
+    const ranges = [...new Set(Object.entries(pkg.peerDependencies)
       .filter(([name]) => name.startsWith(DSH_PACKAGE_PREFIX))
       .map(([, version]) => String(version)))]
-    assert.equal(pins.length, 1, 'peerDependencies 的 dsh 包必须钉同一版本线')
-    const dshPin = pins[0]
+    assert.equal(ranges.length, 1, 'peerDependencies 的 dsh 包必须写同一兼容范围')
+    const dshRange = ranges[0]
 
     for (const pair of DOC_PAIRS) {
       const [en, zh] = pair
@@ -54,7 +54,7 @@ describe('文档契约', () => {
     for (const readme of DOC_PAIRS[0]) {
       const text = await read(readme)
       assert.ok(text.includes(pkg.version), `${readme} 缺少当前插件版本 ${pkg.version}`)
-      assert.ok(text.includes(dshPin), `${readme} 缺少钉住的 DSH 版本线 ${dshPin}`)
+      assert.ok(text.includes(dshRange), `${readme} 缺少支持的 DSH 范围 ${dshRange}`)
     }
   })
 

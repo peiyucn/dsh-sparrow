@@ -85,22 +85,22 @@ describe('package 契约', () => {
     assert.equal(typeof entry.config?.trashRoot, 'string', 'host 行要带 trashRoot 配置（会话回收站目录）')
   })
 
-  it('dsh 版本线应该 peer / devDependencies / README 单一真相', async () => {
+  it('dsh 版本门应该 peer 范围 / devDeps 精确 / README 一致', async () => {
     const pkg = await readJson('package.json')
-    const peerPins = dshPackageVersions(pkg.peerDependencies)
-    assert.equal(peerPins.length, 1, `peerDependencies 的 dsh 包必须钉同一版本线，实际：${peerPins.join(' / ')}`)
-    const pin = peerPins[0]
-    assert.match(pin, SEMVER, `dsh 版本只能写精确版本（禁止 range）：${pin}`)
+    const peerRanges = dshPackageVersions(pkg.peerDependencies)
+    assert.equal(peerRanges.length, 1, `peerDependencies 的 dsh 包必须写同一范围，实际：${peerRanges.join(' / ')}`)
+    const peerRange = peerRanges[0]
+    assert.match(peerRange, /^>=\d+\.\d+\.\d+.*<\d+\.\d+\.\d+$/u, `dsh peer 必须是兼容范围：${peerRange}`)
 
-    for (const [name, version] of Object.entries(pkg.devDependencies)) {
-      if (!name.startsWith(DSH_PACKAGE_PREFIX)) continue
-      assert.equal(version, pin, `devDependency ${name} 必须与 peer 版本线一致`)
-    }
+    const devPins = dshPackageVersions(pkg.devDependencies)
+    assert.equal(devPins.length, 1, `devDependencies 的 dsh 包必须写同一精确版本，实际：${devPins.join(' / ')}`)
+    const devPin = devPins[0]
+    assert.match(devPin, SEMVER, `dsh devDependencies 只能写精确版本：${devPin}`)
 
     for (const readme of ['README.md', 'README.zh-CN.md']) {
       const text = await read(readme)
       assert.ok(text.includes(pkg.version), `${readme} 缺少当前插件版本 ${pkg.version}`)
-      assert.ok(text.includes(pin), `${readme} 缺少钉住的 DSH 版本线 ${pin}`)
+      assert.ok(text.includes(peerRange), `${readme} 缺少支持的 DSH 范围 ${peerRange}`)
     }
   })
 
