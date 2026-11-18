@@ -18,7 +18,7 @@ English | [简体中文](README.zh-CN.md)
 
 ## Requirements
 
-* Requires DSH >=0.2.2-rc.3 <0.2.3, the 0.2.2 line; other plugins in this repository share the same range.
+* Requires DSH >=0.2.2-rc.3 <0.2.3, the 0.2.2 line; other plugins in this repository share the same range. This release is built and verified against 0.2.2-rc.5.
 * Node.js 24.9 or newer, matching the DSH host requirement.
 * Notes, tasks and session management need no network or account setup. **Schedule aggregation** needs at least one source configured in the panel (WeCom CalDAV sync password, iCloud app-specific password, or personal Outlook via Microsoft Graph); public ICS subscriptions are added from the same settings page.
 

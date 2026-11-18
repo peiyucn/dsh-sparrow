@@ -2,7 +2,7 @@
   "name": "@dsh-sparrow/dsh-desk-one",
   "description": "Desk One — a shared desk for you and your DSH harness: notes, tasks, a read-only calendar and annotations on workspace files in one panel.",
   "icon": "icon.svg",
-  "version": "0.2.2-rc.3",
+  "version": "0.2.2-rc.5",
   "license": "MIT",
   "homepage": "https://dsh.pyai.site",
   "repository": {

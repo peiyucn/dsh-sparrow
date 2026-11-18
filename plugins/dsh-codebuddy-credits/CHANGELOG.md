@@ -3,6 +3,10 @@
 All notable user-facing changes are documented here.
 See [简体中文](./CHANGELOG.zh-CN.md).
 
+## [0.2.2-rc.5] - 2026-11-19
+
+- Adapted to official dsh 0.2.2-rc.5 (web and desktop); no user-perceivable changes.
+
 ## [0.2.2-rc.3] - 2026-11-15
 
 - The 🐦 dsh-sparrow brand line at the bottom of the credits panel is removed.
