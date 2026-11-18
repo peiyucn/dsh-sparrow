@@ -7,6 +7,7 @@ import type { DeskNote, DeskTask, NoteColor, TaskStatus } from './contract.js'
 import { DeskModelError } from './model/errors.js'
 import { isTaskStatus, normalizeDue, normalizeGroupId, normalizeSessionIds, normalizeOrder } from './model/fields.js'
 export { DeskModelError } from './model/errors.js'
+export { normalizeSessionIds } from './model/fields.js'
 export type { GroupPatch, GroupInput } from './model/groups.js'
 export { createGroupRecord, filterGroups, normalizeGroupInput, patchGroupRecord, sortGroups } from './model/groups.js'
 

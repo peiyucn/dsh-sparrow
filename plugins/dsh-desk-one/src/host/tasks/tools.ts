@@ -3,6 +3,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { NOTE_COLORS, PACKAGE_NAME, TASK_STATUSES } from '../../constants.js'
+import { normalizeSessionIds } from '../../model.js'
 import { textOutput, toolError } from '../tools/shared.js'
 import type { DeskStore } from '../store.js'
 
@@ -77,7 +78,7 @@ export function registerTaskTools(ctx: Context, store: DeskStore): void {
 
   ctx.tools.register(defineTool({
     name: 'desk_task_update',
-    description: 'Update one desk task (title, description, lane, color, due date, order, group). Use desk_task_list to get the current revision first.',
+    description: 'Update one desk task (title, description, lane, color, due date, order, group). Set link_current_session true to attach this conversation to an existing task. Use desk_task_list to get the current revision first.',
     parameters: {
       id: { type: 'string', required: true, description: 'Task id from desk_task_list.' },
       expected_revision: { type: 'number', required: true, description: 'Revision returned by desk_task_list.' },
@@ -91,24 +92,40 @@ export function registerTaskTools(ctx: Context, store: DeskStore): void {
       order: { type: 'number', description: 'New manual order in the lane.' },
       group_id: { type: 'string', description: 'Move the task into this group (must be in the target lane).' },
       clear_group: { type: 'boolean', description: 'Move the task out of its group.' },
+      link_current_session: { type: 'boolean', description: 'Link the conversation that called this tool to the existing task (the session id is resolved from the tool context).' },
     },
     output: textOutput,
-    async execute(args) {
+    async execute(args, exec) {
       try {
-        const due = args.clear_due === true
+        const { link_current_session, ...rest } = args
+        const due = rest.clear_due === true
           ? null
-          : args.due_date === undefined ? undefined : { date: args.due_date, timezone: args.due_timezone }
-        const groupId = args.clear_group === true ? null : args.group_id
+          : rest.due_date === undefined ? undefined : { date: rest.due_date, timezone: rest.due_timezone }
+        const groupId = rest.clear_group === true ? null : rest.group_id
+        let sessionIds: readonly string[] | undefined
+        if (link_current_session === true) {
+          if (exec.agent === undefined) {
+            throw new Error('当前工具调用没有会话上下文，无法关联本会话')
+          }
+          const current = store.listTasks().find(task => task.id === args.id)
+          if (current === undefined) throw new Error(`任务不存在：${args.id}`)
+          sessionIds = normalizeSessionIds([...current.sessionIds, String(exec.agent.id)])
+        }
         const task = await store.updateTask(args.id, args.expected_revision, {
-          ...args.title === undefined ? {} : { title: args.title },
-          ...args.body === undefined ? {} : { body: args.body },
-          ...args.status === undefined ? {} : { status: args.status },
-          ...args.color === undefined ? {} : { color: args.color },
+          ...rest.title === undefined ? {} : { title: rest.title },
+          ...rest.body === undefined ? {} : { body: rest.body },
+          ...rest.status === undefined ? {} : { status: rest.status },
+          ...rest.color === undefined ? {} : { color: rest.color },
           ...due === undefined ? {} : { due },
-          ...args.order === undefined ? {} : { order: args.order },
+          ...rest.order === undefined ? {} : { order: rest.order },
           ...groupId === undefined ? {} : { groupId },
+          ...sessionIds === undefined ? {} : { sessionIds },
         })
-        return JSON.stringify({ ok: true, task, summary: `已更新任务「${task.title}」` })
+        return JSON.stringify({
+          ok: true,
+          task,
+          summary: `已更新任务「${task.title}」${link_current_session === true ? '（已关联本会话）' : ''}`,
+        })
       } catch (error) {
         toolError(error)
       }
