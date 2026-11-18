@@ -2,6 +2,7 @@
 
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
+import { MAX_TASK_SESSIONS } from '../../../lib/constants.js'
 import { registerTaskTools } from '../../../lib/host/tasks/tools.js'
 import { collectTools } from '../../structure/helpers.ts'
 
@@ -10,17 +11,37 @@ type Tool = {
   execute: (input: Record<string, unknown>, context: unknown) => Promise<unknown>
 }
 
+type FakeTask = {
+  id: string
+  title: string
+  revision: number
+  sessionIds: string[]
+}
 
-function fakeStore() {
+type FakeUpdate = {
+  id: string
+  expectedRevision: number
+  patch: Record<string, unknown>
+}
+
+
+function fakeStore(tasks: FakeTask[] = []) {
   const created: Array<Record<string, unknown>> = []
+  const updates: FakeUpdate[] = []
   return {
     created,
+    updates,
+    tasks,
     createTask: async (raw: Record<string, unknown>) => {
       created.push(raw)
       return { id: `task_${created.length}`, title: raw.title }
     },
-    listTasks: () => [],
-    updateTask: async () => ({}),
+    listTasks: () => tasks,
+    updateTask: async (id: string, expectedRevision: number, patch: Record<string, unknown>) => {
+      updates.push({ id, expectedRevision, patch })
+      const current = tasks.find(task => task.id === id)
+      return { ...current, ...patch, revision: (current?.revision ?? 0) + 1 }
+    },
   }
 }
 
@@ -28,6 +49,13 @@ function addTool(store: unknown) {
   const tools = collectTools(registerTaskTools, store) as unknown as Tool[]
   const tool = tools.find(candidate => candidate.name === 'desk_task_add')
   if (tool === undefined) throw new Error('desk_task_add 未注册')
+  return tool
+}
+
+function updateTool(store: unknown) {
+  const tools = collectTools(registerTaskTools, store) as unknown as Tool[]
+  const tool = tools.find(candidate => candidate.name === 'desk_task_update')
+  if (tool === undefined) throw new Error('desk_task_update 未注册')
   return tool
 }
 
@@ -72,5 +100,69 @@ describe('desk_task_add 会话关联', () => {
     assert.equal(store.created[0].dueDate, '2026-11-20')
     assert.equal(store.created[0].dueTimezone, 'Asia/Shanghai')
     assert.equal(store.created[0].due_date, undefined)
+  })
+})
+
+describe('desk_task_update 已有任务补挂会话', () => {
+  it('link_current_session 应把当前会话追加到已有 sessionIds', async () => {
+    const store = fakeStore([{ id: 'task_1', title: '已有任务', revision: 3, sessionIds: ['session-a'] }])
+    const tool = updateTool(store)
+    const output = await tool.execute(
+      { id: 'task_1', expected_revision: 3, link_current_session: true },
+      { agent: { id: 'session-b' } },
+    )
+    assert.equal(store.updates.length, 1)
+    assert.equal(store.updates[0].expectedRevision, 3)
+    assert.deepEqual(store.updates[0].patch.sessionIds, ['session-a', 'session-b'])
+    assert.match(String(output), /已关联本会话/u)
+  })
+
+  it('重复补挂同一会话不产生重复 id', async () => {
+    const store = fakeStore([{ id: 'task_1', title: '已有任务', revision: 2, sessionIds: ['session-a'] }])
+    const tool = updateTool(store)
+    await tool.execute(
+      { id: 'task_1', expected_revision: 2, link_current_session: true },
+      { agent: { id: 'session-a' } },
+    )
+    assert.deepEqual(store.updates[0].patch.sessionIds, ['session-a'])
+  })
+
+  it('缺少 agent 上下文时拒绝补挂', async () => {
+    const store = fakeStore([{ id: 'task_1', title: '已有任务', revision: 1, sessionIds: [] }])
+    const tool = updateTool(store)
+    await assert.rejects(
+      () => tool.execute({ id: 'task_1', expected_revision: 1, link_current_session: true }, {}),
+      /没有会话上下文/u,
+    )
+    assert.equal(store.updates.length, 0)
+  })
+
+  it('任务不存在时明确报错且不调用 store 更新', async () => {
+    const store = fakeStore()
+    const tool = updateTool(store)
+    await assert.rejects(
+      () => tool.execute({ id: 'task_missing', expected_revision: 1, link_current_session: true }, { agent: { id: 'session-a' } }),
+      /任务不存在/u,
+    )
+    assert.equal(store.updates.length, 0)
+  })
+
+  it('已有会话达到上限时明确报错且不静默截断', async () => {
+    const sessionIds = Array.from({ length: MAX_TASK_SESSIONS }, (_, index) => `session-${index}`)
+    const store = fakeStore([{ id: 'task_1', title: '已有任务', revision: 1, sessionIds }])
+    const tool = updateTool(store)
+    await assert.rejects(
+      () => tool.execute({ id: 'task_1', expected_revision: 1, link_current_session: true }, { agent: { id: 'session-new' } }),
+      /最多关联/u,
+    )
+    assert.equal(store.updates.length, 0)
+  })
+
+  it('不传 link_current_session 时原有更新行为不变', async () => {
+    const store = fakeStore([{ id: 'task_1', title: '旧标题', revision: 4, sessionIds: ['session-a'] }])
+    const tool = updateTool(store)
+    await tool.execute({ id: 'task_1', expected_revision: 4, title: '新标题' }, { agent: { id: 'session-b' } })
+    assert.equal(store.updates[0].patch.title, '新标题')
+    assert.equal(store.updates[0].patch.sessionIds, undefined)
   })
 })
