@@ -39,17 +39,19 @@ describe('任务卡折叠与 running 视觉契约', () => {
     assert.match(TASK_CARD_CSS, /data-card-collapsed='true'/u)
     assert.match(TASK_CARD_CSS, /dsh-task-body-toggle/u)
     assert.match(TASK_CARD_CSS, /data-running='true'/u)
-    assert.match(TASK_CARD_CSS, /prefers-reduced-motion/u)
+    assert.doesNotMatch(TASK_CARD_CSS, /prefers-reduced-motion/u)
+    assert.match(TASK_CARD_CSS, /animation: dsh-task-card-orbit 3s linear infinite/u)
     assert.match(TASK_CARD_CSS, /dsh-task-compact-sessions/u)
     for (const color of ['default', 'yellow', 'green', 'blue', 'pink']) {
       assert.match(TASK_CARD_CSS, new RegExp(`data-color='${color}'`, 'u'))
     }
   })
 
-  it('归档样式包含同色 running ring 与 reduced-motion', () => {
+  it('归档样式包含同色 running ring，且 running 环不被 reduced-motion 停转', () => {
     assert.match(TASK_ARCHIVE_CSS, /dsh-task-archive-row\[data-running='true'\]/u)
-    assert.match(TASK_ARCHIVE_CSS, /prefers-reduced-motion/u)
     assert.match(TASK_ARCHIVE_CSS, /dsh-task-running-accent/u)
+    assert.match(TASK_ARCHIVE_CSS, /animation: dsh-task-card-orbit 3s linear infinite/u)
+    assert.doesNotMatch(TASK_ARCHIVE_CSS, /dsh-task-archive-row\[data-running='true'\]::after\s*\{[^}]*animation:\s*none/u)
   })
 
   it('折叠 / running 相关中英文案齐全', () => {

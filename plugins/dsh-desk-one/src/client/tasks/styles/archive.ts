@@ -218,10 +218,4 @@ export const TASK_ARCHIVE_CSS = `
   pointer-events: none;
   --dsh-task-running-ring: color-mix(in srgb, var(--dsh-task-running-accent) 78%, var(--dsw-alias-label-primary, #1f2329));
 }
-@media (prefers-reduced-motion: reduce) {
-  .dsh-task-archive-row[data-running='true']::after {
-    animation: none;
-    background: color-mix(in srgb, var(--dsh-task-running-accent) 55%, transparent);
-  }
-}
 `

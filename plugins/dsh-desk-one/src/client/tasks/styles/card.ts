@@ -210,14 +210,6 @@ export const TASK_CARD_CSS = `
 .dsh-task-session[data-state='unavailable'] {
   opacity: 0.65;
 }
-@media (prefers-reduced-motion: reduce) {
-  .dsh-task-session[data-state='running']::before {
-    animation: none;
-  }
-  .dsh-task-session[data-state='running'] {
-    border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary, #2e9e5b) 55%, transparent);
-  }
-}
 .dsh-task-session-title {
   appearance: none;
   border: none;
@@ -632,11 +624,5 @@ export const TASK_CARD_CSS = `
 }
 @keyframes dsh-task-card-orbit {
   to { --dsh-task-card-orbit-angle: 360deg; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .dsh-task-card[data-running='true']::after {
-    animation: none;
-    background: color-mix(in srgb, var(--dsh-task-running-accent) 55%, transparent);
-  }
 }
 `
