@@ -1,9 +1,10 @@
-import { buildBackdropCss, backdropPlan, LAYER_SELECTOR, REQUIRED_CSS_FEATURES, STYLE_SELECTOR } from '../backdrop.js'
+import { buildBackdropCss, backdropPlan, bootHandoffPending, ensureBackdropLayer, REQUIRED_CSS_FEATURES, STYLE_SELECTOR } from '../backdrop.js'
 import { buildGlassCss } from '../glass.js'
 import { buildNavPinCss } from '../nav-pin.js'
 import { buildSurfaceCss } from '../surfaces.js'
 import {
-  BACKDROP_CLASS,
+  BOOT_RELOCATE_ATTEMPTS,
+  BOOT_RELOCATE_RETRY_MS,
   LOCALE_NAMESPACE,
   MARKER_ATTR,
   name,
@@ -122,15 +123,7 @@ function install(ctx: ClientContext): void {
     return style
   }
 
-  const ensureLayer = (): HTMLDivElement => {
-    const existing = document.querySelector<HTMLDivElement>(LAYER_SELECTOR)
-    if (existing !== null) return existing
-    const layer = document.createElement('div')
-    layer.setAttribute(MARKER_ATTR, '')
-    layer.classList.add(BACKDROP_CLASS)
-    document.body.appendChild(layer)
-    return layer
-  }
+  const ensureLayer = (): HTMLDivElement => ensureBackdropLayer(document)
 
   const paintPlain = (plain: boolean): void => {
     if (markerHost === null) return
@@ -143,6 +136,19 @@ function install(ctx: ClientContext): void {
   resources.style = ensureStyles()
   resources.layer = ensureLayer()
   const layer = resources.layer
+
+  let bootRelocateTimer: ReturnType<typeof setTimeout> | undefined
+  const relocateAfterBoot = (delayMs: number, attemptsLeft: number): void => {
+    bootRelocateTimer = setTimeout(() => {
+      bootRelocateTimer = undefined
+      if (bootHandoffPending(document)) {
+        if (attemptsLeft > 0) relocateAfterBoot(BOOT_RELOCATE_RETRY_MS, attemptsLeft - 1)
+        return
+      }
+      ensureBackdropLayer(document)
+    }, delayMs)
+  }
+  if (bootHandoffPending(document)) relocateAfterBoot(0, BOOT_RELOCATE_ATTEMPTS)
 
   const scope = c.configForms.get(SETTINGS_NAMESPACE) as Scope
   const rowStore = createThemeToneRowStore(c.theme.getTheme().active.colorScheme as ColorScheme)
@@ -159,6 +165,7 @@ function install(ctx: ClientContext): void {
   let warned = false
 
   c.effect(() => () => {
+    if (bootRelocateTimer !== undefined) clearTimeout(bootRelocateTimer)
     resources.layer?.remove()
     resources.style?.remove()
     disposeTokens?.()
@@ -222,6 +229,7 @@ function install(ctx: ClientContext): void {
   }
 
   const repaint = (): void => {
+    ensureBackdropLayer(document)
     syncRow(c.theme.getTheme().active.colorScheme as ColorScheme)
     if (!shouldPaint()) return
     const settings = readSettings()
