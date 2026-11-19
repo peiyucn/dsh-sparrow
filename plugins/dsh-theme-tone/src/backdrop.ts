@@ -123,3 +123,38 @@ export function tonePreview(scheme: ColorScheme, id: ToneId): { backgroundColor:
 export const BACKDROP_SELECTOR = `[${MARKER_ATTR}]`
 export const LAYER_SELECTOR = `div[${MARKER_ATTR}]`
 export const STYLE_SELECTOR = `style[${MARKER_ATTR}]`
+
+export const LAYER_HOST_ID = 'root'
+export const BOOT_OVERLAY_ATTR = 'data-dsh-boot'
+
+export function bootHandoffPending(doc: Document): boolean {
+  const root = doc.getElementById(LAYER_HOST_ID)
+  if (root === null) return false
+  const overlay = doc.querySelector(`[${BOOT_OVERLAY_ATTR}]`)
+  return overlay !== null && overlay.parentElement === root
+}
+
+export function backdropLayerHost(doc: Document): Element {
+  const root = doc.getElementById(LAYER_HOST_ID)
+  if (root === null) return doc.body
+  return bootHandoffPending(doc) ? doc.body : root
+}
+
+export function ensureBackdropLayer(doc: Document): HTMLDivElement {
+  const host = backdropLayerHost(doc)
+  const existing = doc.querySelector<HTMLDivElement>(LAYER_SELECTOR)
+  if (existing !== null) {
+    if (existing.parentElement !== host) {
+      existing.remove()
+      if (host === doc.body) host.appendChild(existing)
+      else host.prepend(existing)
+    }
+    return existing
+  }
+  const layer = doc.createElement('div')
+  layer.setAttribute(MARKER_ATTR, '')
+  layer.classList.add(BACKDROP_CLASS)
+  if (host === doc.body) host.appendChild(layer)
+  else host.prepend(layer)
+  return layer
+}

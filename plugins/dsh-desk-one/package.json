@@ -2,7 +2,7 @@
   "name": "@dsh-sparrow/dsh-desk-one",
   "description": "Desk One — a shared desk for you and your DSH harness: notes, tasks, a read-only calendar and annotations on workspace files in one panel.",
   "icon": "icon.svg",
-  "version": "0.2.2-rc.3",
+  "version": "0.2.2-rc.5",
   "license": "MIT",
   "homepage": "https://dsh.pyai.site",
   "repository": {
@@ -71,6 +71,7 @@
     "@deepseek-ai/dsh-session-persistence": ">=0.2.2-rc.3 <0.2.3",
     "@deepseek-ai/dsh-session-query": ">=0.2.2-rc.3 <0.2.3",
     "@deepseek-ai/dsh-storage-domain": ">=0.2.2-rc.3 <0.2.3",
+    "@deepseek-ai/dsh-system-prompt": ">=0.2.2-rc.3 <0.2.3",
     "@deepseek-ai/dsh-tools": ">=0.2.2-rc.3 <0.2.3",
     "@deepseek-ai/dsh-workspace": ">=0.2.2-rc.3 <0.2.3"
   },
@@ -95,6 +96,7 @@
     "@deepseek-ai/dsh-session-query": "0.2.2-rc.5",
     "@deepseek-ai/dsh-storage": "0.2.2-rc.5",
     "@deepseek-ai/dsh-storage-domain": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-system-prompt": "0.2.2-rc.5",
     "@deepseek-ai/dsh-tools": "0.2.2-rc.5",
     "@deepseek-ai/dsh-workspace": "0.2.2-rc.5",
     "@types/node": "^24.19.2",

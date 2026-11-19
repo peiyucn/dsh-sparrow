@@ -2,6 +2,18 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## [0.2.2-rc.5] - 2026-11-19
+
+- Adapted to official dsh 0.2.2-rc.5 (web and desktop).
+- Fixed a macOS desktop bug: enabling a tone locked the Desktop window — it could no longer be dragged and
+  double-clicking the title bar no longer zoomed / maximized it. The full-screen backdrop layer is now mounted
+  inside the host `#root` instead of as a direct `body` child, so the host's `body > :not(#root)` rule no longer
+  turns the whole window into a non-draggable region. Windows was unaffected.
+- Fixed a startup regression from that change: the host client boots with `hydrateRoot` over `#root`, so the
+  backdrop layer must not be inserted as a `#root` child while the boot overlay is still there — otherwise the
+  overlay stuck at "Loading plugins…" and the main UI only showed after scrolling. The layer now moves into
+  `#root` after the boot handoff completes (bounded retries + repaint fallback; no observers or rAF).
+
 ## [0.2.2-rc.3] - 2026-11-15
 
 - Adapted to official dsh 0.2.2-rc.3 (web and desktop): official hover cards (workspace rows and session previews) now follow the theme's surface and label tokens through the official theme channel, so the selected tone keeps its colors on both themes; turn navigation keeps its wider 700px persistence. No other visual changes intended.

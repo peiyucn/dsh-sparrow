@@ -312,6 +312,9 @@ importers:
       '@deepseek-ai/dsh-storage-domain':
         specifier: 0.2.2-rc.5
         version: 0.2.2-rc.5(@deepseek-ai/cordis@4.1.0)(@deepseek-ai/dsh-storage@0.2.2-rc.5(@deepseek-ai/cordis@4.1.0))
+      '@deepseek-ai/dsh-system-prompt':
+        specifier: 0.2.2-rc.5
+        version: 0.2.2-rc.5(@deepseek-ai/cordis@4.1.0)(@deepseek-ai/dsh-llm@0.2.2-rc.5(@deepseek-ai/cordis@4.1.0)(@deepseek-ai/dsh-error@0.2.2-rc.5(@deepseek-ai/cordis@4.1.0)))(@deepseek-ai/dsh-scope@0.2.2-rc.5(@deepseek-ai/cordis@4.1.0))
       '@deepseek-ai/dsh-tools':
         specifier: 0.2.2-rc.5
         version: 0.2.2-rc.5(@deepseek-ai/cordis@4.1.0)(@deepseek-ai/dsh-agent@0.2.2-rc.5(0ed64d44925d0c713f38f0da8dc986ac))(@deepseek-ai/dsh-llm@0.2.2-rc.5(@deepseek-ai/cordis@4.1.0)(@deepseek-ai/dsh-error@0.2.2-rc.5(@deepseek-ai/cordis@4.1.0)))(@deepseek-ai/dsh-scope@0.2.2-rc.5(@deepseek-ai/cordis@4.1.0))(@deepseek-ai/dsh-session@0.2.2-rc.5(@deepseek-ai/cordis@4.1.0)(@deepseek-ai/dsh-error@0.2.2-rc.5(@deepseek-ai/cordis@4.1.0))(@deepseek-ai/dsh-scope@0.2.2-rc.5(@deepseek-ai/cordis@4.1.0)))(@deepseek-ai/dsh-system-prompt@0.2.2-rc.5(@deepseek-ai/cordis@4.1.0)(@deepseek-ai/dsh-llm@0.2.2-rc.5(@deepseek-ai/cordis@4.1.0)(@deepseek-ai/dsh-error@0.2.2-rc.5(@deepseek-ai/cordis@4.1.0)))(@deepseek-ai/dsh-scope@0.2.2-rc.5(@deepseek-ai/cordis@4.1.0)))(@deepseek-ai/dsh-user-approval@0.2.2-rc.5(3b5da5a163d911e06a2cca6f415e2b64))

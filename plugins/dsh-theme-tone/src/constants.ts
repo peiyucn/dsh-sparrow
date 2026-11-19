@@ -20,6 +20,9 @@ export const SHELL_OVERLAY_ATTR = 'data-shell-overlay'
 export const WIDTH_HANDLE_ATTR = 'data-width-handle'
 export const SIDE_ATTR = 'data-side'
 
+export const BOOT_RELOCATE_RETRY_MS = 500
+export const BOOT_RELOCATE_ATTEMPTS = 6
+
 export const TOP_VARIABLE = '--dsh-theme-tone-top'
 export const BOTTOM_VARIABLE = '--dsh-theme-tone-bottom'
 export const LEFT_VARIABLE = '--dsh-theme-tone-left'

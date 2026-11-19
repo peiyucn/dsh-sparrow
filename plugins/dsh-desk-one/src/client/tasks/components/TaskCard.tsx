@@ -9,8 +9,10 @@ import { ActionTooltip } from '../../app/ActionTooltip.js'
 import type { DeskTranslator } from '../../app/types.js'
 import type { SessionChipInfo } from '../../sessions/contract.js'
 import { useAnchoredPanel } from '../hooks/useAnchoredPanel.js'
+import { readTaskCardUi, writeTaskCardUi } from '../taskCardState.js'
+import type { TaskCardUiState } from '../taskCardState.js'
 import { TaskSessionChip, sessionStatusText } from './TaskSessionChip.js'
-import { autoGrow, daysUntil } from './taskCardUtils.js'
+import { autoGrow, daysUntil, hasRunningSession } from './taskCardUtils.js'
 
 interface TaskCardProps {
   readonly task: DeskTask
@@ -43,6 +45,10 @@ export function TaskCard({
   const [editing, setEditing] = useState<EditableField | null>(null)
   const [editingDue, setEditingDue] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [ui, setUi] = useState<TaskCardUiState>(() => readTaskCardUi(task.id))
+  const cardCollapsed = ui.card === 'collapsed'
+  const bodyExpanded = ui.body === 'expanded'
+  const running = hasRunningSession(sessionChips)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [sessionPickerOpen, setSessionPickerOpen] = useState(false)
   const [sessionQuery, setSessionQuery] = useState('')
@@ -63,6 +69,26 @@ export function TaskCard({
   const overdue = remaining !== undefined && remaining < 0
   const dueSoon = remaining !== undefined && remaining >= 0 && remaining <= 1
   const canArchive = task.status === 'done'
+
+
+  const updateUi = (patch: TaskCardUiState): void => {
+    setUi(current => {
+      const next = { ...current, ...patch }
+      writeTaskCardUi(task.id, next)
+      return next
+    })
+  }
+
+  const toggleCard = (): void => {
+    setPaletteOpen(false)
+    setSessionPickerOpen(false)
+    setPreviewId(null)
+    updateUi({ card: cardCollapsed ? undefined : 'collapsed' })
+  }
+
+  const toggleBody = (): void => {
+    updateUi({ body: bodyExpanded ? undefined : 'expanded' })
+  }
 
 
   const colorIndex = NOTE_COLORS.indexOf(task.color)
@@ -163,6 +189,45 @@ export function TaskCard({
   const visibleSessionOptions = sessionOptions.filter(option =>
     sessionSearch === '' || option.title.toLowerCase().includes(sessionSearch))
 
+  const renderActions = (): ReactElement => (
+    <div className="dsh-task-actions" data-confirm={confirmDelete ? 'true' : undefined}>
+      {canArchive
+        ? (
+            <ActionTooltip label={t('task.archive')}>
+              <button
+                type="button"
+                className="dsh-desk-iconbtn dsh-desk-iconbtn-sm"
+                aria-label={t('task.archive')}
+                onClick={() => onArchive(task)}
+              >
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                  <path d="M4 5.5h12v11H4zM3 3.5h14v2H3zM8 9h4" />
+                </svg>
+              </button>
+            </ActionTooltip>
+          )
+        : null}
+      <ActionTooltip label={confirmDelete ? t('task.deleteConfirm') : t('task.delete')}>
+        <button
+          type="button"
+          className="dsh-desk-iconbtn dsh-desk-iconbtn-sm dsh-desk-iconbtn-danger"
+          data-confirm={confirmDelete}
+          aria-label={confirmDelete ? t('task.deleteConfirm') : t('task.delete')}
+          onClick={() => {
+            if (confirmDelete) onDelete(task.id)
+            else setConfirmDelete(true)
+          }}
+          onBlur={() => setConfirmDelete(false)}
+        >
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+            <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
+          </svg>
+          {confirmDelete ? <span className="dsh-desk-confirm-label">{t('task.deleteConfirm')}</span> : null}
+        </button>
+      </ActionTooltip>
+    </div>
+  )
+
   return (
     <article
       className="dsh-task-card"
@@ -171,8 +236,11 @@ export function TaskCard({
       data-dragging={dragging}
       data-overdue={overdue}
       data-due-soon={dueSoon}
+      data-card-collapsed={cardCollapsed ? 'true' : undefined}
+      data-running={running ? 'true' : undefined}
       onPointerDown={(event) => onStartDrag(task, event)}
     >
+      <div className="dsh-task-head">
       {editing === 'title'
         ? (
             <textarea
@@ -211,7 +279,52 @@ export function TaskCard({
               {task.title}
             </div>
           )}
-      {editing === 'body'
+        <button
+          type="button"
+          className="dsh-task-collapse"
+          aria-label={cardCollapsed ? t('task.card.expand') : t('task.card.collapse')}
+          aria-expanded={!cardCollapsed}
+          title={cardCollapsed ? t('task.card.expand') : t('task.card.collapse')}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation()
+            toggleCard()
+          }}
+        >
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d={cardCollapsed ? 'M4 6l4 4 4-4' : 'M4 10l4-4 4 4'} />
+          </svg>
+        </button>
+      </div>
+      {cardCollapsed
+        ? (
+            <div className="dsh-task-compact">
+              {task.due === undefined
+                ? null
+                : (
+                    <span className="dsh-task-compact-due" data-overdue={overdue} data-soon={dueSoon} title={`${t('task.due')}: ${task.due.date}`}>
+                      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+                        <rect x="3.5" y="4.5" width="13" height="12" rx="1.5" />
+                        <path d="M3.5 8h13M6.5 3.5v3M13.5 3.5v3" />
+                      </svg>
+                      <span>{task.due.date}</span>
+                    </span>
+                  )}
+              {task.sessionIds.length === 0
+                ? null
+                : (
+                    <span className="dsh-task-compact-sessions" title={t('task.session.count', { count: task.sessionIds.length })}>
+                      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M4 5.5h12v8H9l-3 2.5v-2.5H4z" />
+                      </svg>
+                      <span>{task.sessionIds.length}</span>
+                    </span>
+                  )}
+              {renderActions()}
+            </div>
+          )
+        : null}
+      {!cardCollapsed && editing === 'body'
         ? (
             <textarea
               ref={bodyRef}
@@ -229,15 +342,51 @@ export function TaskCard({
               }}
             />
           )
-        : (
-            <div
-              className={task.body === '' ? 'dsh-task-body dsh-task-text dsh-task-body-empty' : 'dsh-task-body dsh-task-text'}
-              onClick={() => setEditing('body')}
-            >
-              {task.body === '' ? t('task.bodyPlaceholder') : task.body}
+        : null}
+      {!cardCollapsed && editing !== 'body'
+        ? (
+            <div className="dsh-task-body-row">
+              <div
+                className={task.body === '' ? 'dsh-task-body dsh-task-text dsh-task-body-empty' : 'dsh-task-body dsh-task-text'}
+                data-collapsed={!bodyExpanded}
+                onClick={() => {
+                  if (task.body === '') {
+                    setEditing('body')
+                    return
+                  }
+                  if (!bodyExpanded) {
+                    toggleBody()
+                    return
+                  }
+                  setEditing('body')
+                }}
+              >
+                {task.body === '' ? t('task.bodyPlaceholder') : task.body}
+              </div>
+              {task.body === ''
+                ? null
+                : (
+                    <button
+                      type="button"
+                      className="dsh-task-body-toggle"
+                      aria-label={bodyExpanded ? t('task.body.collapse') : t('task.body.expand')}
+                      aria-expanded={bodyExpanded}
+                      title={bodyExpanded ? t('task.body.collapse') : t('task.body.expand')}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        toggleBody()
+                      }}
+                    >
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d={bodyExpanded ? 'M4 10l4-4 4 4' : 'M4 6l4 4 4-4'} />
+                      </svg>
+                    </button>
+                  )}
             </div>
-          )}
-      {(sessionEnabled || sessionChips.length > 0)
+          )
+        : null}
+      {!cardCollapsed && (sessionEnabled || sessionChips.length > 0)
         ? (
             <div className="dsh-task-sessions">
               {sessionChips.length === 0
@@ -286,7 +435,7 @@ export function TaskCard({
             </div>
           )
         : null}
-      {sessionPickerOpen && sessionEnabled
+      {!cardCollapsed && sessionPickerOpen && sessionEnabled
         ? createPortal(
 
 
@@ -333,7 +482,9 @@ export function TaskCard({
             document.body,
           )
         : null}
-      <div className="dsh-task-foot">
+      {!cardCollapsed
+        ? (
+            <div className="dsh-task-foot">
         <ActionTooltip label={t('task.color')}>
           <button
             type="button"
@@ -410,43 +561,10 @@ export function TaskCard({
                 {task.due === undefined ? null : <span className="dsh-task-due-date">{task.due.date}</span>}
               </button>
             )}
-        <div className="dsh-task-actions" data-confirm={confirmDelete ? 'true' : undefined}>
-          {canArchive
-            ? (
-                <ActionTooltip label={t('task.archive')}>
-                  <button
-                    type="button"
-                    className="dsh-desk-iconbtn dsh-desk-iconbtn-sm"
-                    aria-label={t('task.archive')}
-                    onClick={() => onArchive(task)}
-                  >
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-                      <path d="M4 5.5h12v11H4zM3 3.5h14v2H3zM8 9h4" />
-                    </svg>
-                  </button>
-                </ActionTooltip>
-              )
-            : null}
-          <ActionTooltip label={confirmDelete ? t('task.deleteConfirm') : t('task.delete')}>
-            <button
-              type="button"
-              className="dsh-desk-iconbtn dsh-desk-iconbtn-sm dsh-desk-iconbtn-danger"
-              data-confirm={confirmDelete}
-              aria-label={confirmDelete ? t('task.deleteConfirm') : t('task.delete')}
-              onClick={() => {
-                if (confirmDelete) onDelete(task.id)
-                else setConfirmDelete(true)
-              }}
-              onBlur={() => setConfirmDelete(false)}
-            >
-              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-                <path d="M4 6.5h12M8 6.5V5h4v1.5M6 6.5l.7 8.5h6.6l.7-8.5M8.5 9v4M11.5 9v4" />
-              </svg>
-              {confirmDelete ? <span className="dsh-desk-confirm-label">{t('task.deleteConfirm')}</span> : null}
-            </button>
-          </ActionTooltip>
-        </div>
+        {renderActions()}
       </div>
+          )
+        : null}
     </article>
   )
 }

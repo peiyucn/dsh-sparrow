@@ -1,12 +1,12 @@
 # 10 · 新会话任务捕获
 
-> 状态：**Phase 1 已实现（2026-11-16）——skill + 工具；常驻 system prompt 暂缓。** host 半改动需要重启 DSH 后生效；真实新会话验收待重启后补。本阶段先验证“skill 被加载时模型是否会主动问”，不够稳定再进入 Phase 2。
+> 状态：**Phase 1 + Phase 2 已实现（2026-11-19）——skill + 工具 + 常驻 system prompt。** host 半改动需要重启 DSH 后生效；真实新会话验收待重启后补。Phase 2 的完整规则见 `12-auto-task-capture-prompt.md`。
 
 ## 背景
 
 Desk One 的任务板已经能挂会话（任务卡显示会话 chip，可跳回会话），但用户要自己想起来去建任务。目标是在**新会话第一次输入**看起来是“要跟踪的一件事”时，主动问一次是否建待办并挂上本会话，把“随手聊的事”接到任务板。
 
-本阶段不加常驻提示词。`desk-one` skill 只在被模型加载时生效，所以这次实验的变量就是：**新会话里模型会不会因为请求像任务而加载该 skill，并照着 skill 里的规则先问。**
+Phase 1 不加常驻提示词，`desk-one` skill 只在被模型加载时生效。Phase 2 已加常驻 system prompt 作为稳定触发层，skill 保留为详细操作指南。
 
 ## 触发规则
 
@@ -27,14 +27,16 @@ Desk One 的任务板已经能挂会话（任务卡显示会话 chip，可跳回
 3. 用户拒绝或没回应 → 不建任务，本会话不再提。
 4. 用户明确要求建任务 → 直接建，不再问一遍。
 
-## 实现分工（Phase 1）
+## 实现分工（Phase 1 + Phase 2）
 
 | 层 | 职责 |
 |---|---|
 | `src/host/skill.ts` | `desk-one` skill 里的“新会话任务捕获”小节：触发边界（首轮 / 可跟踪事项 / 拒绝后不再问 / 纯问答不问）+ 同意后的建卡流程、标题 / 状态 / body 规则 |
 | `src/host/tasks/tools.ts` | `desk_task_add` 新增 `link_current_session`；从工具上下文的 agent id 取当前会话 |
+| `src/host/prompt.ts` | Phase 2 常驻 system prompt：首轮触发、先查本会话、已有未挂任务先问补挂、不静默建卡 |
+| `src/host/tasks/tools.ts` | `desk_task_list` 新增 `linked_to_current_session`；补挂复用 `desk_task_update.link_current_session` |
 
-**Phase 2（暂缓）**：如果真实新会话里 skill 没有被加载、不会主动问，再加一段很短的常驻 system prompt section 作为触发层；本轮不注册。
+**Phase 2（已实现，spec 12）**：owner 已确认常驻 system prompt 作为触发层；触发边界、先问后建、已有任务补挂与去重见 `12-auto-task-capture-prompt.md`。待重启 DSH 做真机验收。
 
 ## 数据与边界
 
@@ -42,7 +44,7 @@ Desk One 的任务板已经能挂会话（任务卡显示会话 chip，可跳回
 - 会话关联仍受单任务最多 `MAX_TASK_SESSIONS`（当前 10）的约束；已有任务的补挂见 `11-task-session-link.md`。
 - 任务状态不会随会话 running / idle 自动变化；会话 chip 只是关联与跳转。
 - 不做跨会话记忆；每个新会话独立判断一次。
-- 本阶段没有常驻提示词，触发依赖 skill 被加载；这是本次实验的已知变量。
+- Phase 2 已加常驻提示词；skill 仍保留为详细操作指南，两者规则一致。
 
 ## 验收
 

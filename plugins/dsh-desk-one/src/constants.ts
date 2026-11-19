@@ -185,6 +185,8 @@ export const TASK_SORT_STORAGE_KEY = 'dsh-desk-one:task-sort'
 export const TASK_GROUPS_STORAGE_KEY = 'dsh-desk-one:task-groups'
 
 export const TASK_GROUP_COLLAPSE_STORAGE_KEY = 'dsh-desk-one:task-group-collapsed'
+export const TASK_CARD_STATE_STORAGE_KEY = 'dsh-desk-one:task-card-state'
+export const TASK_CARD_STATE_LIMIT = 500
 
 export const TASK_BOARD_COMPACT_WIDTH = 720
 

@@ -15,6 +15,9 @@ const REQUIRED_SPECS = [
   '05-schedule.md',
   '06-session-index.md',
   '07-notebook.md',
+  '12-auto-task-capture-prompt.md',
+  '13-task-card-collapse.md',
+  '14-task-card-running-orbit.md',
 ]
 const DOC_PAIRS = [
   ['README.md', 'README.zh-CN.md'],

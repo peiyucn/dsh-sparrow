@@ -50,31 +50,40 @@ export function registerTaskTools(ctx: Context, store: DeskStore): void {
 
   ctx.tools.register(defineTool({
     name: 'desk_task_list',
-    description: 'List desk tasks in board order. Excludes archived tasks by default; optionally filter by lane and keyword.',
+    description: 'List desk tasks in board order. Excludes archived tasks by default; optionally filter by lane, keyword, group, or the current conversation link.',
     parameters: {
       status: { type: 'string', enum: TASK_STATUSES, description: 'Only tasks in this lane.' },
       query: { type: 'string', description: 'Case-insensitive keyword over title and body.' },
       group_id: { type: 'string', description: 'Only tasks in this group (desk_group_list gives ids); empty string = ungrouped.' },
       limit: { type: 'number', description: 'Maximum tasks to return (default 50, max 200).' },
       include_archived: { type: 'boolean', description: 'Include archived tasks (default false).' },
+      linked_to_current_session: { type: 'boolean', description: 'Only tasks linked to the conversation that called this tool (resolved from the tool context).' },
     },
     output: textOutput,
-    execute(args) {
+    execute(args, exec) {
+      if (args.linked_to_current_session === true && exec.agent === undefined) {
+        return Promise.reject(new Error('当前工具调用没有会话上下文，无法按本会话过滤'))
+      }
+      const currentSessionId = args.linked_to_current_session === true && exec.agent !== undefined ? String(exec.agent.id) : undefined
       const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.min(Math.floor(args.limit), 200) : 50
       const groupId = typeof args.group_id === 'string' ? args.group_id.trim() : undefined
       const tasks = store.listTasks(args.query)
         .filter(task => (args.status === undefined || task.status === args.status)
           && (args.include_archived === true || !task.archived)
-          && (groupId === undefined || (groupId === '' ? task.groupId === undefined : task.groupId === groupId)))
+          && (groupId === undefined || (groupId === '' ? task.groupId === undefined : task.groupId === groupId))
+          && (currentSessionId === undefined || task.sessionIds.includes(currentSessionId)))
         .slice(0, limit)
       return Promise.resolve(JSON.stringify({
         ok: true,
         total: tasks.length,
         tasks,
-        summary: tasks.length === 0 ? '没有匹配的任务' : `返回 ${tasks.length} 条任务${args.include_archived === true ? '（含存档）' : '（默认不含存档）'}`,
+        summary: tasks.length === 0
+          ? '没有匹配的任务'
+          : `返回 ${tasks.length} 条任务${args.include_archived === true ? '（含存档）' : '（默认不含存档）'}${currentSessionId === undefined ? '' : '（本会话）'}`,
       }))
     },
   }))
+
 
   ctx.tools.register(defineTool({
     name: 'desk_task_update',
