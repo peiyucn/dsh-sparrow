@@ -73,6 +73,15 @@ export class ReviewRepository {
   }
 
 
+  async unmarkReviewSession(sessionId: string): Promise<boolean> {
+    const id = reviewSessionId(sessionId)
+    const existing = this.core.nodes.get(id)
+    if (existing?.kind !== 'review-session') return false
+    await this.core.nodes.delete(id)
+    return true
+  }
+
+
   private async pruneReviewSessions(): Promise<void> {
     const markers = this.core.allNodes().filter((node): node is ReviewSessionMarker => node.kind === 'review-session')
     if (markers.length <= NOTEBOOK_MAX_REVIEW_SESSIONS) return

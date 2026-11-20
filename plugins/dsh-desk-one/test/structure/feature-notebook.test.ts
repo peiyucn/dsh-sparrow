@@ -83,6 +83,10 @@ describe('笔记 / 审阅契约', () => {
     }
     const keys = NOTEBOOK_ROUTES.map(route => `${route.method} ${route.path}`)
     assert.equal(new Set(keys).size, keys.length, '路由表不得有重复的 method + path')
+    assert.ok(
+      NOTEBOOK_ROUTES.some(route => route.method === 'DELETE' && route.path === ROUTES.notebookReviewSessions),
+      '审阅标记应支持 DELETE 清除',
+    )
   })
 
   it('客户端笔记库数据面应该暴露状态 / 链接切换 / 搜索 / 列表 / 文件 / 草稿 / 历史 / 审阅编排动作', () => {
@@ -98,6 +102,7 @@ describe('笔记 / 审阅契约', () => {
       'saveDraft',
       'listReviewSessions',
       'markReviewSession',
+      'unmarkReviewSession',
       'history',
       'recordReview',
       'deleteHistory',
