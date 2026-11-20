@@ -156,7 +156,7 @@ DeepSeek Harness（DSH）Web 插件合集，每个插件独立 npm 包、独立�
 - **测试侧类型检查**：每个插件 `tsconfig.test.json` 检查 `test/**/*.ts`；根 `tsconfig.test.json` 检查根 `test/**/*.ts`（QG 负例）。测试全部是 `.ts`，Node 24 原生剥类型运行。
 - **纯逻辑目录**：`plugins/dsh-desk-one/src/model`（L003）。项目 ESLint 配置为 `meta/lint/project-eslint.mjs`，根目录无 `eslint.config.mjs`（L007）。
 - **CI（`.github/workflows/ci.yml`）**：`typecheck` → `build` → `test` → `package`（E24）。`typecheck` job 先跑 `pnpm run lint`、`test:policy`、`typecheck:policy`，再 `typecheck:all`；`test` job 上传 JUnit artifact。
-- **required checks**：`typecheck`、`build`、`test`、`package`（F5 / E24）。已配置（2026-11-18）：严格 PR 门禁 ruleset 覆盖 `main` / `dev`，required checks 四项、strict 策略开启、owner bypass = `pull_request`；发布 tag 保护 ruleset 覆盖 `refs/tags/*-v*`、owner bypass = `always`；默认分支与 `dev` 各一条轻保护 ruleset；合并设置 squash-only、合并后删除分支。
+- **required checks**：`typecheck`、`build`、`test`、`package`（F5 / E24）。已配置（2026-11-18）：严格 PR 门禁 ruleset 覆盖 `main` / `dev`，required checks 四项、strict 策略开启、owner bypass = `pull_request`；发布 tag 保护 ruleset 覆盖 `refs/tags/*-v*`、owner bypass = `always`；默认分支与 `dev` 各一条轻保护 ruleset；合并设置 squash + merge commit（发布 PR 用 merge commit）、合并后删除分支。
 - **发布（`.github/workflows/publish.yml`）**：environment `npm-publish`；tag `<插件名>-vX.Y.Z`；tag 提交须在 `main`；发布前跑 `pnpm run lint` 与插件 `npm run verify`；E18 安全门禁用 `SECURITY_ALERTS_TOKEN`，在 `npm publish` 前 fail-closed；promote 手动任务只允许 `latest` / `next`；不建 GitHub Release。
 - **部署**：`.github/workflows/market.yml` 的 `deploy` job 发布 `dsh.pyai.site`（environment `github-pages`）。
 - **打包产物（E9）**：npm 包内容由各插件 `package.json` 的 `files` 决定（`lib/**`、`cordis.patch.yml`、中英 README / CHANGELOG）；`lib/` 是构建产物、不进 git；仓库不保留 `releases/`。
