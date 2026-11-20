@@ -11,7 +11,7 @@
 | 2 | 运行色 | **跟任务卡五色 accent**（default / yellow / green / blue / pink），不用统一 success green |
 | 3 | 生效范围 | 展开态 + compact 态 + 归档视图条目 |
 | 4 | 数量 | 多个 running 会话也只画一圈，不叠加 |
-| 5 | 动效 | conic-gradient orbit 旋转；`prefers-reduced-motion` 下停转为静态环 |
+| 5 | 动效 | conic-gradient orbit 始终旋转（owner 决定：running 是状态提示，不随 `prefers-reduced-motion` 停转） |
 | 6 | 数据 | 纯客户端派生；不写任务记录、不写 localStorage、不发请求 |
 
 ## 派生
@@ -42,7 +42,7 @@
 - compact 态复用同一 ring（13 的 compact 只改内容布局，不动 ring）。
 - 归档行用同一色/动画，但环贴合行圆角；颜色点、标题、操作不遮挡。
 - `@property --dsh-task-card-orbit-angle` + keyframes；周期约 3s，线性无限。
-- `@media (prefers-reduced-motion: reduce)`：`animation: none`，保留 `color-mix(... 55% ...)` 的静态环；不只靠动画区分状态。
+- 不设 `prefers-reduced-motion` 停转分支：running 环始终旋转。owner 决策（2026-11-20）——running 是状态提示；若跟随 reduced-motion 停转，大量开启该选项的用户会看不出运行状态。其它非 running 的装饰性动画仍遵守 reduced-motion。
 
 ## 行为与边界
 
@@ -50,7 +50,7 @@
 - 卡片被拖拽时环继续/不闪烁；`data-dragging` 仍只降低透明度。
 - 整卡折叠（13）与描述折叠不影响 running 判定；compact 仍能看到环。
 - 无会话服务时卡片照常可用，不显示环、不报错。
-- 不把 ring 做成可点击入口；不改变会话 chip 的现有动画。
+- 不把 ring 做成可点击入口；不改动 running 之外的会话 chip 动画。
 - 性能：动画只改 CSS 自定义属性角度；不触发布局；一张卡最多一个 ring 伪元素。
 
 ## 涉及文件
@@ -58,10 +58,10 @@
 - `src/client/tasks/components/TaskCard.tsx`：`running` 派生 + `data-running`。
 - `src/client/tasks/components/TaskColumn.tsx` / `TaskBoard.tsx`：把 running 派生结果传给归档视图（看板已有 sessionChips）。
 - `src/client/tasks/components/TaskArchiveView.tsx`：归档行 `data-running` + 传入的 runningTaskIds。
-- `src/client/tasks/styles/card.ts` + `styles/archive.ts`：ring 变量、伪元素、reduced-motion、compact 适配。
+- `src/client/tasks/styles/card.ts` + `styles/archive.ts`：ring 变量、伪元素、始终旋转、compact 适配。
 - `src/client/tasks/taskCardUtils.ts` 或现有 session 工具：纯函数 `hasRunningSession(chips)`，便于测试。
-- `test/client/task-card-running.test.ts`：available+running、idle、archived、unavailable、缺服务、空列表。
-- `test/structure/feature-tasks.test.ts`：结构守卫（data-running / 动画 / reduced-motion 存在）。
+- `test/client/task-card-features.test.ts`：available+running、idle、archived、unavailable、缺服务、空列表。
+- `test/client/task-card-features.test.ts`：结构守卫（data-running / 动画存在 / running 环不被 reduced-motion 停转）。
 
 ## 验收
 
@@ -71,7 +71,7 @@
 4. 黄/绿/蓝/粉/default 五种卡各显示对应色环；浅色与深色主题下均可辨认。
 5. compact 卡同样有环；展开/收起整卡不改变环状态。
 6. 归档视图对应行有同一 ring；恢复/删除行为不变。
-7. `prefers-reduced-motion: reduce` 下环不转，静态可见。
+7. `prefers-reduced-motion: reduce` 下环仍旋转（owner 决策）。
 8. 拖拽、编辑、点操作不因环受影响；环不拦截点击。
 9. 左边五色条、截止/逾期边框不变；环叠加不覆盖文字。
 10. `npm run verify` 全绿；中英文无需新增文案（如需 tooltip 再补）。
@@ -87,5 +87,5 @@
 ## 证据与版本
 
 - 单测覆盖 running 派生纯函数；结构守卫覆盖视觉入口。
-- 浅色 / 深色各截「running 卡」「idle 卡」「compact running」「归档 running」对比图；reduced-motion 手测记录。
+- 浅色 / 深色各截「running 卡」「idle 卡」「compact running」「归档 running」对比图；reduced-motion 下仍旋转的手测记录。
 - 并入 rc5；发布 `latest` + `next`，发布暂缓到所有 spec / 证据齐全并经 owner 当次确认。
