@@ -13,6 +13,8 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 - Bundled earlier unreleased work: archive refresh and two-step confirmations, two-step session deletion, session list pagination/sorting/time display, and the unified five-color palette for notes and tasks.
 - Notebook review now opens in the current conversation by default; a secondary "review in a new session" action creates a dedicated one. Opening the tab alone no longer marks the conversation — the first saved annotation (or an explicit new session) does, and the session-row badge can be clicked to clear a mistaken mark.
 - Adapted to official dsh 0.2.2-rc.5 (web and desktop); the official web-search default change does not affect this plugin.
+- The annotation composer can only be closed with Cancel: outside clicks and Escape no longer dismiss it, even when empty. With text, Cancel first asks for a second click; an empty composer closes immediately. Opening another annotation while one is open no longer replaces it — cancel first.
+- Microsoft Outlook browser sign-in now builds its OAuth callback from the host web server's real port; desktop windows whose location has no port previously redirected to port 80 and never returned. The success page also no longer navigates back to `/` after consent.
 
 ## [0.2.2-rc.3] - 2026-11-15
 
