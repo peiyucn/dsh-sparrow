@@ -14,6 +14,11 @@ import type {
 import type { ReviewDocumentController } from './useReviewDocument.js'
 
 
+export function composerDismissable(comment: string): boolean {
+  return comment.trim() === ''
+}
+
+
 export interface ReviewInteractionController {
   readonly selection: SelectionTarget | null
   readonly composer: ComposeTarget | null
@@ -101,11 +106,12 @@ export function useReviewInteraction(input: {
   useEffect(() => {
     if (composer === null) return
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') cancelSelection()
+      if (event.key === 'Escape' && composerDismissable(comment)) cancelSelection()
     }
     const onPointerDown = (event: PointerEvent): void => {
       const composerElement = composerRef.current
       if (composerElement !== null && event.target instanceof Node && composerElement.contains(event.target)) return
+      if (!composerDismissable(comment)) return
       cancelSelection()
     }
     document.addEventListener('keydown', onKeyDown)
@@ -114,7 +120,7 @@ export function useReviewInteraction(input: {
       document.removeEventListener('keydown', onKeyDown)
       document.removeEventListener('pointerdown', onPointerDown, true)
     }
-  }, [cancelSelection, composer])
+  }, [cancelSelection, comment, composer])
 
 
 
