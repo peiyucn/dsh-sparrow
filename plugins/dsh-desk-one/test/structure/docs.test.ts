@@ -18,6 +18,7 @@ const REQUIRED_SPECS = [
   '12-auto-task-capture-prompt.md',
   '13-task-card-collapse.md',
   '14-task-card-running-orbit.md',
+  '15-task-session-unlink.md',
 ]
 const DOC_PAIRS = [
   ['README.md', 'README.zh-CN.md'],

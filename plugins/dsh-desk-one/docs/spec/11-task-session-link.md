@@ -1,6 +1,6 @@
 # 11 · 已有任务补挂当前会话
 
-> 状态：**已实现（2026-11-18）**。来源：任务板卡「Desk One 任务支持 agent 补挂会话」。host 半改动需重启 DSH 后在新会话生效；UI 关联 / 取消关联入口不变。
+> 状态：**已实现（2026-11-18）**。来源：任务板卡「Desk One 任务支持 agent 补挂会话」。host 半改动需重启 DSH 后在新会话生效；UI 关联 / 取消关联入口不变。agent 侧解绑见 `15-task-session-unlink.md`（2026-11-20）。
 
 ## 背景
 
@@ -8,7 +8,7 @@
 
 ## 决策
 
-- **采用卡片的选项 1**：`desk_task_update` 增加 `link_current_session: true`，只挂**当前会话**（从工具上下文 `exec.agent.id` 解析）；不新增单独工具，不开放任意 `session_id` 入参。
+- **采用卡片的选项 1**：`desk_task_update` 增加 `link_current_session: true`，只挂**当前会话**（从工具上下文 `exec.agent.id` 解析）；不新增单独工具，不开放任意 `session_id` 补挂；解绑见 15。
 - **上限沿用 `MAX_TASK_SESSIONS`（当前 10）**：代码、UI 选择器、存储 schema 与测试都用同一常量。任务卡里写的「最多 5 个」与现状不符，本切片不改成 5；改成 5 需要迁移已有 >5 会话的任务，另开任务处理。
 - 补挂复用任务已有的 `sessionIds` 字段与 `normalizeSessionIds`（trim / 去重 / 上限校验）；重复补挂不产生重复 id。
 - `expected_revision` 语义不变：先 `desk_task_list` 拿 revision，再带 revision 更新；补挂可以和其他 patch 同一次提交。
@@ -26,7 +26,7 @@
 
 - 不新增存储字段、不改 `sessionIds` 的 schema、不改 UI 交互。
 - 会话删除 / 归档后关联保留的既有规则不变。
-- 不做任意会话补挂与 agent 侧取消关联（UI 的取消关联保持原样）；需要时另开切片。
+- 不做任意会话补挂；agent 侧解绑由 15 切片补上（UI 的取消关联仍可用）。
 - 不改变新会话任务捕获的触发规则（见 `10-task-capture.md`）。
 
 ## 涉及文件
@@ -48,6 +48,6 @@
 
 ## 非目标
 
-- 任意已知 `session_id` 的补挂 / 解绑工具。
+- 任意已知 `session_id` 的**补挂**；解绑见 15。
 - 调整任务卡上限为 5、或迁移既有 6–10 会话的任务。
 - 改变任务捕获的「先问再做」规则。

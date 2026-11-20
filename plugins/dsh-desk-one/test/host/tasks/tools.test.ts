@@ -177,6 +177,100 @@ describe('desk_task_update 已有任务补挂会话', () => {
   })
 })
 
+describe('desk_task_update 会话解绑', () => {
+  it('unlink_session_ids 只移除指定会话', async () => {
+    const store = fakeStore([{ id: 'task_1', title: '已有任务', revision: 5, sessionIds: ['session-a', 'session-b', 'session-c'] }])
+    const tool = updateTool(store)
+    const output = await tool.execute(
+      { id: 'task_1', expected_revision: 5, unlink_session_ids: ['session-b'] },
+      {},
+    )
+    assert.equal(store.updates.length, 1)
+    assert.deepEqual(store.updates[0].patch.sessionIds, ['session-a', 'session-c'])
+    assert.match(String(output), /已解绑 1 个会话/u)
+  })
+
+  it('unlink_current_session 移除当前会话', async () => {
+    const store = fakeStore([{ id: 'task_1', title: '已有任务', revision: 2, sessionIds: ['session-a', 'session-b'] }])
+    const tool = updateTool(store)
+    const output = await tool.execute(
+      { id: 'task_1', expected_revision: 2, unlink_current_session: true },
+      { agent: { id: 'session-b' } },
+    )
+    assert.deepEqual(store.updates[0].patch.sessionIds, ['session-a'])
+    assert.match(String(output), /已解绑本会话/u)
+  })
+
+  it('unlink_session_ids 与 link_current_session 可在同一次更新里替换会话', async () => {
+    const store = fakeStore([{ id: 'task_1', title: '已有任务', revision: 3, sessionIds: ['session-old'] }])
+    const tool = updateTool(store)
+    const output = await tool.execute(
+      { id: 'task_1', expected_revision: 3, unlink_session_ids: ['session-old'], link_current_session: true },
+      { agent: { id: 'session-new' } },
+    )
+    assert.deepEqual(store.updates[0].patch.sessionIds, ['session-new'])
+    assert.match(String(output), /已关联本会话/u)
+    assert.match(String(output), /已解绑 1 个会话/u)
+  })
+
+  it('unlink_session_ids 含未关联 id 时整体拒绝，不静默部分删除', async () => {
+    const store = fakeStore([{ id: 'task_1', title: '已有任务', revision: 1, sessionIds: ['session-a'] }])
+    const tool = updateTool(store)
+    await assert.rejects(
+      () => tool.execute({ id: 'task_1', expected_revision: 1, unlink_session_ids: ['session-a', 'session-missing'] }, {}),
+      /未关联这些会话/u,
+    )
+    assert.equal(store.updates.length, 0)
+  })
+
+  it('unlink_current_session 未关联时明确报错', async () => {
+    const store = fakeStore([{ id: 'task_1', title: '已有任务', revision: 1, sessionIds: ['session-a'] }])
+    const tool = updateTool(store)
+    await assert.rejects(
+      () => tool.execute({ id: 'task_1', expected_revision: 1, unlink_current_session: true }, { agent: { id: 'session-b' } }),
+      /本会话未关联该任务/u,
+    )
+    assert.equal(store.updates.length, 0)
+  })
+
+  it('缺少 agent 上下文时拒绝解绑本会话', async () => {
+    const store = fakeStore([{ id: 'task_1', title: '已有任务', revision: 1, sessionIds: ['session-a'] }])
+    const tool = updateTool(store)
+    await assert.rejects(
+      () => tool.execute({ id: 'task_1', expected_revision: 1, unlink_current_session: true }, {}),
+      /没有会话上下文/u,
+    )
+    assert.equal(store.updates.length, 0)
+  })
+
+  it('link_current_session 与 unlink_current_session 不能同时传', async () => {
+    const store = fakeStore([{ id: 'task_1', title: '已有任务', revision: 1, sessionIds: ['session-a'] }])
+    const tool = updateTool(store)
+    await assert.rejects(
+      () => tool.execute({ id: 'task_1', expected_revision: 1, link_current_session: true, unlink_current_session: true }, { agent: { id: 'session-b' } }),
+      /不能同时关联和解绑/u,
+    )
+    assert.equal(store.updates.length, 0)
+  })
+
+  it('unlink_session_ids 为空时明确报错', async () => {
+    const store = fakeStore([{ id: 'task_1', title: '已有任务', revision: 1, sessionIds: ['session-a'] }])
+    const tool = updateTool(store)
+    await assert.rejects(
+      () => tool.execute({ id: 'task_1', expected_revision: 1, unlink_session_ids: [] }, {}),
+      /至少需要一个会话 id/u,
+    )
+    assert.equal(store.updates.length, 0)
+  })
+
+  it('unlink_session_ids 不需要 agent 上下文', async () => {
+    const store = fakeStore([{ id: 'task_1', title: '已有任务', revision: 4, sessionIds: ['session-a'] }])
+    const tool = updateTool(store)
+    await tool.execute({ id: 'task_1', expected_revision: 4, unlink_session_ids: ['session-a'] }, {})
+    assert.deepEqual(store.updates[0].patch.sessionIds, [])
+  })
+})
+
 describe('desk_task_list 当前会话过滤', () => {
   const tasks: FakeTask[] = [
     { id: 'task_1', title: '本会话任务', revision: 1, sessionIds: ['session-1'], status: 'todo' },

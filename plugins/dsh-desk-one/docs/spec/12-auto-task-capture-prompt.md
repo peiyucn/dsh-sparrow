@@ -67,7 +67,7 @@ Never create a task or change a link without the user's explicit consent. If the
 
 ### 已有任务补挂
 
-复用 PR #9 的 `desk_task_update` + `link_current_session: true`；不新增工具、不开放任意 `session_id` 入参。
+复用 PR #9 的 `desk_task_update` + `link_current_session: true`；不新增工具、不开放任意 `session_id` 补挂；解绑见 15。
 
 ## 数据与边界
 
