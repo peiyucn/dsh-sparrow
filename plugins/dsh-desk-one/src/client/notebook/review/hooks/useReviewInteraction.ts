@@ -8,6 +8,7 @@ import { messageOf } from '../../../app/utils.js'
 import type { NotebookApi } from '../../api.js'
 import type { ReviewBridge } from '../../review-bridge.js'
 import { annotationsByLine, annotationMessage, selectedRangeOf } from '../format.js'
+import { persistReviewSession } from '../sessions.js'
 import type {
   ComposeTarget, OverlayKind, ReviewTarget, ReviewView, SelectionTarget,
 } from '../types.js'
@@ -179,11 +180,14 @@ export function useReviewInteraction(input: {
     persist(composer.editingId === undefined
       ? [...annotations, next]
       : annotations.map(item => item.id === composer.editingId ? next : item))
+    if (target !== undefined) {
+      persistReviewSession(notebook, { sessionId, workspaceId: target.workspaceId, fileId: target.fileId })
+    }
     setComposer(null)
     setComment('')
     setSelection(null)
     window.getSelection()?.removeAllRanges()
-  }, [annotations, comment, composer, persist])
+  }, [annotations, comment, composer, notebook, persist, sessionId, target])
 
 
   const submitAll = useCallback((): void => {
@@ -193,6 +197,7 @@ export function useReviewInteraction(input: {
       setNotice(t('review.submitFailed'))
       return
     }
+    persistReviewSession(notebook, { sessionId, workspaceId: target.workspaceId, fileId: target.fileId })
     void notebook.recordReview({
       sessionId,
       workspaceId: target.workspaceId,

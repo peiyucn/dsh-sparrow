@@ -11,6 +11,7 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 - New-conversation task capture now has a short always-on system prompt: it asks once when the first message looks like trackable work, checks whether this conversation is already linked, and offers to link an existing unlinked task instead of creating a duplicate. It never creates or links silently.
 - `desk_task_list` can filter by the current conversation, and `desk_task_update` can link the current conversation to an existing task.
 - Bundled earlier unreleased work: archive refresh and two-step confirmations, two-step session deletion, session list pagination/sorting/time display, and the unified five-color palette for notes and tasks.
+- Notebook review now opens in the current conversation by default; a secondary "review in a new session" action creates a dedicated one. Opening the tab alone no longer marks the conversation — the first saved annotation (or an explicit new session) does, and the session-row badge can be clicked to clear a mistaken mark.
 - Adapted to official dsh 0.2.2-rc.5 (web and desktop); the official web-search default change does not affect this plugin.
 
 ## [0.2.2-rc.3] - 2026-11-15

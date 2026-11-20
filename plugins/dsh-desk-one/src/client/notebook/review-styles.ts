@@ -77,11 +77,33 @@ body:not(:has([data-composer-placeholder])) .dsh-desk-review-composer-hint {
   width: 14px;
   height: 14px;
 }
+.dsh-desk-review-session-mark-clear {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+}
+.dsh-desk-review-session-mark-clear:hover {
+  background: var(--dsw-alias-bg-layer-2, rgba(0, 0, 0, 0.05));
+}
 /* The document-preview header action wears the same blue, so both review entry points read as one
    feature. Tint the glyph wrapper, not the button, to leave the official hover fill untouched. */
 .dsh-desk-review-entry-icon {
   display: inline-flex;
   color: var(--dsw-alias-state-business-primary, #4176e6);
+}
+.dsh-desk-review-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.dsh-desk-review-new-icon {
+  font-size: 16px;
+  line-height: 1;
+  color: var(--dsw-alias-label-secondary, #6b7280);
 }
 
 /* Frontmatter block: quiet metadata card above the page content (raw frontmatter is stripped from body). */

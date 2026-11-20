@@ -23,6 +23,7 @@ function fakeNotebook() {
       }
     },
     markReviewSession: async () => undefined,
+    unmarkReviewSession: async () => undefined,
   }
   return { state, api }
 }
