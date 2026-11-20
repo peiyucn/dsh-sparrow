@@ -12,6 +12,7 @@ All notable changes to `dsh-desk-one` are documented here. The format follows Ke
 - `desk_task_list` can filter by the current conversation, and `desk_task_update` can link the current conversation to an existing task.
 - Bundled earlier unreleased work: archive refresh and two-step confirmations, two-step session deletion, session list pagination/sorting/time display, and the unified five-color palette for notes and tasks.
 - Adapted to official dsh 0.2.2-rc.5 (web and desktop); the official web-search default change does not affect this plugin.
+- Microsoft Outlook browser sign-in now builds its OAuth callback from the host web server's real port; desktop windows whose location has no port previously redirected to port 80 and never returned. The success page also no longer navigates back to `/` after consent.
 
 ## [0.2.2-rc.3] - 2026-11-15
 

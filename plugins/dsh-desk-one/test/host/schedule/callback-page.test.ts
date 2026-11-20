@@ -27,6 +27,7 @@ describe('renderOutlookCallbackPage', () => {
     assert.ok(nonce !== undefined && nonce !== '')
     assert.equal(page.contentSecurityPolicy, `default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`)
     assert.ok(page.body.includes('window.close()'))
+    assert.ok(!page.body.includes('window.location.href'))
 
 
     assert.ok(!page.body.includes('postMessage'))

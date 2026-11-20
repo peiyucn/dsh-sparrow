@@ -88,7 +88,7 @@
 | POST | `outlook/login/poll` | 轮询登录/设备码结果 |
 | POST | `outlook/disconnect` | 断开 Outlook Graph |
 
-**唯一例外（`outlook/callback`）**：这是 Microsoft 发起的顶层浏览器导航，不带插件的同源头（`Origin` / `Sec-Fetch-Site`），`host/router.ts` 的 `isLoopbackOauthCallback` 仅对该路径放行，靠一次性 `state` 校验防 CSRF。因此这一页自己不信任任何输入：标题与消息文本 HTML 转义、每个响应生成一个 CSP nonce 且只允许该 nonce 的脚本；它不向 `window.opener` 发 `postMessage`（面板靠轮询拿结果，消息没有监听方）。
+**唯一例外（`outlook/callback`）**：这是 Microsoft 发起的顶层浏览器导航，不带插件的同源头（`Origin` / `Sec-Fetch-Site`），`host/router.ts` 的 `isLoopbackOauthCallback` 仅对该路径放行，靠一次性 `state` 校验防 CSRF。因此这一页自己不信任任何输入：标题与消息文本 HTML 转义、每个响应生成一个 CSP nonce 且只允许该 nonce 的脚本；它不向 `window.opener` 发 `postMessage`（面板靠轮询拿结果，消息没有监听方）。成功页只尝试关闭自身，不导航回 `/`——没有应用认证上下文的顶层 `location` 跳转会把窗口带到登录页；连接结果由面板轮询。
 
 ## 5. 适配器与订阅
 
@@ -96,7 +96,7 @@
 | :--- | :--- | :--- | :--- | :--- |
 | 企业微信（工作） | CalDAV `caldav.wecom.work` | 发现入口 `/.well-known/caldav`；日历家目录疑似裸 `/calendar/`（**未验证**）；按日历 ctag/ETag 增量 | 手机端同步密码；重新获取使旧密码失效 | 非 IANA TZID（靠内嵌 VTIMEZONE）；读限额未查到 |
 | iCloud（个人） | CalDAV `caldav.icloud.com` | 发现可能跳 `pNN-caldav.icloud.com` 分片；REPORT 只请求裸 `<calendar-data/>`；窗口 ≤ 366 天 / 400 条 | Apple ID + App 专用密码（需双重认证；改主密码全部失效） | 60 读/分钟、单日历 5 万事件上限；共享/家庭日历可见性**未验证** |
-| Outlook（个人） | Microsoft Graph OAuth（浏览器回调 + PKCE，设备码兜底） | refresh token → access token；`/me/calendars` + `calendarView`；多日历、UTC、分页 | 公共客户端 Client ID 内置；回调 `http://localhost/api/desk-one/schedule/outlook/callback` 需在应用注册（Microsoft 对 localhost 忽略端口，DSH 端口可变）；权限 `Calendars.ReadWrite`；refresh token 存官方凭据库 | 不发布公开 ICS；登录一次后自动续期 |
+| Outlook（个人） | Microsoft Graph OAuth（浏览器回调 + PKCE，设备码兜底） | refresh token → access token；`/me/calendars` + `calendarView`；多日历、UTC、分页 | 公共客户端 Client ID 内置；host 从 `ctx.webServer.getOrigin()` 取实际端口生成 `http://localhost:<port>/.../callback`（桌面端 `window.location.port` 为空，不能直接拼；Microsoft 注册时对 localhost 忽略端口，但实际重定向仍按授权请求里的 URI）；权限 `Calendars.ReadWrite`；refresh token 存官方凭据库 | 不发布公开 ICS；登录一次后自动续期 |
 | 订阅（ICS，provider 无关） | 任意**公网 https** ICS 链接（多条，拒绝回环 / 内网 / 链路本地地址与 `.local` 等本地名） | 条件 GET；每条链接 = 一本日历；重定向逐跳校验 | 链接本身就是凭据；URL 存官方凭据库 | 公开可读，仅适合外部订阅；刷新由发布方决定 |
 
 统一适配器接口：`probe` / `listCalendars` / `pull(cursor, window)`；失败分类 `AUTH_EXPIRED`（不自动重试）与 `TRANSIENT`（退避重试）。
@@ -122,7 +122,7 @@
 ## 8. 实现顺序与未验证项
 
 1. **企业微信 CalDAV**（先做：公司日程信息量最大）→ 探针验证 `/.well-known/caldav`、家目录、VTIMEZONE、REPORT 形态。
-2. **Outlook Graph OAuth**（浏览器回调 + PKCE 为主，设备码兜底；多日历 `/me/calendars` + `calendarView`，refresh token 存凭据库；`http://localhost/.../callback` 注册为免端口回调）。
+2. **Outlook Graph OAuth**（浏览器回调 + PKCE 为主，设备码兜底；多日历 `/me/calendars` + `calendarView`，refresh token 存凭据库；host 用 webServer 实际端口生成 `http://localhost:<port>/.../callback`；桌面端 `window.location.port` 为空时必须由 host 补齐）。
 3. **iCloud CalDAV**（分片、REPORT、限流、共享日历可见性）。
 4. **通用 ICS 订阅**（provider 无关、可多条；链接存凭据库）。
 5. **Outlook ICS**（历史兼容：网页端发布链接，条件 GET + UID upsert；UI 不再暴露）。
