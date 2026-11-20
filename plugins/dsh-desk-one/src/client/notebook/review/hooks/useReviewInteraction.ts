@@ -14,8 +14,8 @@ import type {
 import type { ReviewDocumentController } from './useReviewDocument.js'
 
 
-export function composerDismissable(comment: string): boolean {
-  return comment.trim() === ''
+export function cancelNeedsConfirmation(comment: string): boolean {
+  return comment.trim() !== ''
 }
 
 
@@ -103,26 +103,6 @@ export function useReviewInteraction(input: {
   }, [])
 
 
-  useEffect(() => {
-    if (composer === null) return
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape' && composerDismissable(comment)) cancelSelection()
-    }
-    const onPointerDown = (event: PointerEvent): void => {
-      const composerElement = composerRef.current
-      if (composerElement !== null && event.target instanceof Node && composerElement.contains(event.target)) return
-      if (!composerDismissable(comment)) return
-      cancelSelection()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    document.addEventListener('pointerdown', onPointerDown, true)
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-      document.removeEventListener('pointerdown', onPointerDown, true)
-    }
-  }, [cancelSelection, comment, composer])
-
-
 
   useEffect(() => {
     if (selection === null || composer !== null) return
@@ -164,9 +144,13 @@ export function useReviewInteraction(input: {
   }, [])
 
   const startCompose = useCallback((next: ComposeTarget): void => {
+    if (composer !== null) {
+      setNotice(t('review.finishCurrentFirst'))
+      return
+    }
     setComposer(next)
     setComment('')
-  }, [])
+  }, [composer, setNotice, t])
 
   const saveAnnotation = useCallback((): void => {
     if (composer === null) return

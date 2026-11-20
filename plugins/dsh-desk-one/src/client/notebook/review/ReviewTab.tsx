@@ -1,6 +1,6 @@
 
 
-import { useEffect, type ReactElement } from 'react'
+import { useEffect, useState, type ReactElement } from 'react'
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { LOCALE_NAMESPACE } from '../../../constants.js'
@@ -14,7 +14,7 @@ import { ReviewLayers } from './components/ReviewLayers.js'
 import { ReviewSubmitBar } from './components/ReviewSubmitBar.js'
 import { REVIEW_COMMENT_MAX_CHARS, quoteBlock } from './format.js'
 import { useReviewDocument } from './hooks/useReviewDocument.js'
-import { useReviewInteraction } from './hooks/useReviewInteraction.js'
+import { cancelNeedsConfirmation, useReviewInteraction } from './hooks/useReviewInteraction.js'
 import { useReviewSession } from './hooks/useReviewSession.js'
 import type { NoteReviewParams } from '../review-bridge.js'
 import type { NoteReviewInjected } from './types.js'
@@ -37,6 +37,11 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
   const { target, recovering } = useReviewSession({ notebook, sessionId, navigationParams })
   const data = useReviewDocument({ notebook, sessionId, target, tabVisible: info.tab.visible, t })
   const review = useReviewInteraction({ t, notebook, bridge, sessionId, target, data })
+  const [confirmCancel, setConfirmCancel] = useState(false)
+
+  useEffect(() => {
+    setConfirmCancel(false)
+  }, [review.comment, review.composer])
 
   if (target === undefined) {
     return (
@@ -44,6 +49,19 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
         <p className="dsh-desk-notebook-hint">{recovering ? t('state.loading') : t('review.noPath')}</p>
       </div>
     )
+  }
+
+  const requestCancel = (): void => {
+    if (review.composer === null) return
+    if (!cancelNeedsConfirmation(review.comment)) {
+      review.cancelSelection()
+      return
+    }
+    if (confirmCancel) {
+      review.cancelSelection()
+      return
+    }
+    setConfirmCancel(true)
   }
 
   const composerCard = (
@@ -66,7 +84,9 @@ export function NoteReviewTab(props: ReviewProps): ReactElement {
         onChange={event => review.setComment(event.target.value)}
       />
       <div className="dsh-desk-review-actions">
-        <button type="button" className="dsh-desk-btn" onClick={review.cancelSelection}>{t('review.cancel')}</button>
+        <button type="button" className="dsh-desk-btn" data-confirm={confirmCancel ? 'true' : undefined} onClick={requestCancel}>
+          {confirmCancel ? t('review.cancelConfirm') : t('review.cancel')}
+        </button>
         <button type="button" className="dsh-desk-action dsh-desk-action-primary" disabled={review.comment.trim() === ''} onClick={review.saveAnnotation}>
           {t('review.save')}
         </button>
