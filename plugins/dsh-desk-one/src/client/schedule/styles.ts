@@ -9,7 +9,7 @@ export const SCHEDULE_CSS = `
   flex-direction: column;
   gap: 8px;
   min-height: 0;
-  padding: calc(var(--dsh-desk-header-h) + 8px) 16px 14px;
+  padding: calc(var(--dsh-desk-header-h) + 8px) var(--dsh-desk-content-inline) 14px;
   color: var(--dsw-alias-label-primary, #1f2329);
 }
 .dsh-desk-schedule-page {
@@ -19,7 +19,7 @@ export const SCHEDULE_CSS = `
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
-  padding: calc(var(--dsh-desk-header-h) + 10px) 20px 18px;
+  padding: calc(var(--dsh-desk-header-h) + 10px) var(--dsh-desk-content-inline) 18px;
   box-sizing: border-box;
 }
 
