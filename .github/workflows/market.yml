@@ -1,41 +1,15 @@
 name: Market index
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 on:
-  workflow_run:
-    workflows: [Publish]
-    types: [completed]
   push:
     branches: [main]
     paths:
       - 'market/**'
       - '.github/workflows/market.yml'
-  schedule:
-
-    - cron: '47 3 * * *'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -46,67 +20,10 @@ concurrency:
 jobs:
   build:
     name: build
-
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-        with:
-
-          ref: main
-          fetch-depth: 0
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 11.22.0
-
-      - name: Setup Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-
-
-
-
-
-
-
-
-
-
-
-
-      - name: Regenerate index from npm
-        env:
-          MARKET_INDEX_EXPECT_REPO_VERSION: ${{ github.event_name == 'workflow_run' && '1' || '' }}
-          MARKET_INDEX_EXPECT_WAIT_MS: '300000'
-        run: pnpm run market:index
-
-
-      - name: Guard chain
-        run: pnpm run check
-
-
-      - name: Commit regenerated index
-        run: |
-          if git diff --quiet -- market/; then
-            echo "market/ 无变化，跳过提交"
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add market/
-          git commit -m 'chore(market): 按 npm 现状重生成插件市场索引'
-          git push origin main
-
-
 
       - name: Assemble Pages artifact
         run: |

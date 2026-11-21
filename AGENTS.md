@@ -117,14 +117,13 @@ DeepSeek Harness（DSH）Web 插件合集，每个插件独立 npm 包、独立�
 
 > 对外发布站点：<https://dsh.pyai.site/>。根路径是双语说明页（`market/landing.html`，默认英文、可切中文），索引本体在 <https://dsh.pyai.site/market/index.json>（DSH 插件 → 发现 → 添加索引源）。
 
-- **全自动**：`market.yml` 在 `Publish` 成功后（`workflow_run`）自动跑「从 npm 重生成 → 守卫 fail-closed → 有变化则 bot 提交 `market/` → 发布 Pages」；另有 `main` 上 `market/**` 变动、每日 03:47 UTC、手动 `workflow_dispatch` 三个触发源。
+- **发版后手控**：`Publish` 成功后不再由 Actions 回写。npm 传播后由 owner / agent 运行 `pnpm run market:index`，把 `market/` 变更开 PR；合并后 `market.yml` 只在 `main` 的 `market/**` 变动或手动 `workflow_dispatch` 时部署已提交索引。
 - **真值在仓库里**：`market/index.json` + `market/peer-snapshot.json` 由同一次 `pnpm run market:index` 产出、随同一次提交落地，不手改；`market/.gitattributes` 固定 LF。
 - **数据只来自 npm registry 的 packument**：只读、不下载 tarball、不执行插件代码；版本清单 = 该包所有声明了 `dsh.bundle.patch` 的版本；从未发布的活跃插件跳过收录，首发成功后自动补上。
-- **必须等 npm 传播再生成**：`npm publish` 返回成功时 registry 上可能还查不到该版本。`market-index.mjs` 支持 `MARKET_INDEX_EXPECT` / `MARKET_INDEX_EXPECT_REPO_VERSION` / `MARKET_INDEX_EXPECT_WAIT_MS`；生成后再自检期待版本是否进索引，任一不满足即非零退出且不写文件。只在 `workflow_run` 时等待，其它触发源必须不等。
+- **必须等 npm 传播再生成**：`npm publish` 返回成功时 registry 上可能还查不到该版本。`market-index.mjs` 支持 `MARKET_INDEX_EXPECT` / `MARKET_INDEX_EXPECT_REPO_VERSION` / `MARKET_INDEX_EXPECT_WAIT_MS`；生成后再自检期待版本是否进索引，任一不满足即非零退出且不写文件。手动生成时按需设置等待。
 - **守卫 `check:market-index`**：① 包名集合 = `activePluginNames()`（退役不进、活跃不缺席；从未发布的活跃插件只告警不失败，防止首发被发布前 `check` 死锁）；② 中英双语描述、至少一个能力标签、中英 title 与 icon；③ 每版 `engines.dsh` = 该版 peer 派生值；④ 版本合法 SemVer、降序、且已在 npm 发布过的当前版本在列（以 `peer-snapshot.json` 记录为准）。
-- **允许 CI 写仓库的理由**：索引是纯派生数据、bot 提交范围只在 `market/`、守卫 fail-closed、触发顺序「先发布后生成」。
-- **bot 提交用 `GITHUB_TOKEN`，不触发其它 workflow**；部署用本次 run 内重生成的 artifact。
-- **新鲜度**：bot 提交后部署约 1 分钟；叠加 Pages `max-age=600` 与 DSH `cacheTtlMs`，终端用户最坏约 20 分钟看到新版本。
+- **CI 不写仓库**：market 索引只通过 PR 进入 `main`；`market.yml` 不再 commit / push，只部署已提交索引。
+- **新鲜度**：PR 合并并部署后约 1 分钟；叠加 Pages `max-age=600` 与 DSH `cacheTtlMs`，终端用户最坏约 20 分钟看到新版本。
 - **`title` 口径**：索引标题中英都是 `dsh-sparrow`。
 
 ### 发布（npm 包）
