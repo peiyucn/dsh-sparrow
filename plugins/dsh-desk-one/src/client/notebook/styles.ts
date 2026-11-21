@@ -10,7 +10,7 @@ export const NOTEBOOK_CSS = `
   min-height: 0;
   overflow: hidden;
   container-type: inline-size;
-  padding: calc(var(--dsh-desk-header-h) + 16px) clamp(20px, 3vw, 40px) 16px;
+  padding: calc(var(--dsh-desk-header-h) + 16px) var(--dsh-desk-content-inline) 16px;
 }
 .dsh-desk-notebook-error,
 .dsh-desk-notebook-notice {
@@ -293,7 +293,7 @@ button.dsh-desk-notebook-rowbody {
   flex-direction: column;
   gap: 12px;
   width: 100%;
-  max-width: min(960px, 100%);
+  max-width: var(--dsh-desk-content-max, 1100px);
   min-height: 0;
   margin: 0 auto;
 }

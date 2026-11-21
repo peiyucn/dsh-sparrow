@@ -8,11 +8,14 @@ export const TASK_BOARD_CSS = `
   flex: 1;
   min-height: 0;
   gap: 8px;
-  padding: calc(var(--dsh-desk-header-h) + 14px) 28px 8px;
+  padding: calc(var(--dsh-desk-header-h) + 14px) var(--dsh-desk-content-inline) 8px;
 }
 .dsh-task-lanes {
   flex: 1;
   min-height: 0;
+  width: 100%;
+  max-width: var(--dsh-desk-content-max, 1100px);
+  margin: 0 auto;
   display: flex;
   gap: 12px;
   /* No horizontal scrollbar: below the threshold the lanes switch to their compact form. */

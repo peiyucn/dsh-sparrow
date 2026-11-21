@@ -7,6 +7,10 @@ export const APP_CSS = `
    declares 14px explicitly. */
 .dsh-desk-page {
   --dsh-desk-header-h: calc(76px + var(--dsh-desk-frame-top, 0px));
+  /* Shared content column: header inset, task lanes, schedule/notebook/sessions all use it. */
+  --dsh-desk-content-max: 1100px;
+  --dsh-desk-content-gutter: 28px;
+  --dsh-desk-content-inline: max(var(--dsh-desk-content-gutter), calc((100% - var(--dsh-desk-content-max)) / 2));
   /* Desktop window chrome: the Windows frame already reserves its caption row, while macOS
      overlays the window strip over the page. Official plugin pages add the frame clearance only
      on darwin; doing it unconditionally leaves a blank caption-height band on Windows desktop. */
@@ -53,7 +57,7 @@ html[data-platform='darwin'] .dsh-desk-page {
   right: 0;
   z-index: 5;
   height: var(--dsh-desk-header-h);
-  padding: calc(8px + var(--dsh-desk-frame-top, 0px)) 28px 0;
+  padding: calc(8px + var(--dsh-desk-frame-top, 0px)) var(--dsh-desk-content-inline) 0;
   /* Plain official topbar: solid theme surface, no blur. The glass comes only when the
      theme-tone plugin is active (see the conditional rule below). */
   background-color: var(--dsw-alias-bg-base, #ffffff);
@@ -344,18 +348,20 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
 }
 /* Notes wall is full-bleed: it uses the whole page width, only the header keeps its insets. */
 .dsh-desk-notesview {
+  box-sizing: border-box;
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
   width: 100%;
+  padding-inline: var(--dsh-desk-content-inline);
 }
 .dsh-desk-trash-host {
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding: calc(var(--dsh-desk-header-h) + 14px) 28px 0;
+  padding: calc(var(--dsh-desk-header-h) + 14px) 0 0;
 }
 /* Official Button (sm) parity: outlined by default, primary for the single main action. */
 .dsh-desk-action {
@@ -579,7 +585,7 @@ body:not([data-dsh-theme-tone-plain]):has(> .dsh-theme-tone) .dsh-desk-header::b
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding: calc(var(--dsh-desk-header-h) + 16px) clamp(20px, 3vw, 40px) 16px;
+  padding: calc(var(--dsh-desk-header-h) + 16px) var(--dsh-desk-content-inline) 16px;
 }
 /* Same content cap as the notebook page, so both lists sit on one width. */
 .dsh-desk-sessionsview > * {

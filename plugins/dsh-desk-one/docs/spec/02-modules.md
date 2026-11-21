@@ -18,7 +18,7 @@
 | 五色板 | 便签 / 任务共用 | 每个色名一对 token：`--dsh-desk-color-<name>-paper` 用于便签纸面，`--dsh-desk-color-<name>-accent` 用于便签色点 / 任务卡左边条 / 叠放色卡 / 存档色点；统一声明在 `.dsh-desk-page`，其余文件只引用变量，不再散落 hex |
 | 材质 | theme-tone 的官方对话区顶栏 | 默认 `bg-base` 实色、无模糊；theme-tone 激活且非 plain 时，header 自身透明，由 `::before` 套其 barGlass（54% 底色 + `blur(24px) saturate(170%) brightness(1.04)` + 同相位打光）；DeskOne 不另定玻璃配方 |
 | 滚动条 | `ui-theme` 的 scrollbar skin + 对话区滚动契约 | 不声明 `scrollbar-width`（会关闭 Chromium 的 ::-webkit-scrollbar 规则）；track margin 只错开顶部（header + 2px），底部保留 2px，thumb 和内容都能滚到底；面板内把 `--dsh-scrollbar-thumb{,-hover}` 重绑为 label-primary 26% / 40%，因为官方浅色 l1 `#e5e5e5` 在白底上几乎看不见 |
-| 内容区 | 各功能自身语义 | 与页头间距统一 14px；便签墙固定宽度、纵向无限、横向不滚动、全宽动态；任务板三泳道；Sessions 为会话目录 + 归档管理（四区统一行布局）；页头靠 theme-tone 决定是否玻璃 |
+| 内容区 | 各功能自身语义 | 与页头间距统一 14px；页头与任务板 / 日程 / 笔记 / 会话共用同一内容列（min(1100px, 100% - 56px) 居中，窄面板固定 28px 边距）；便签墙在同一内容列内纵向无限、横向不滚动；任务板三泳道；Sessions 为会话目录 + 归档管理（四区统一行布局）；页头靠 theme-tone 决定是否玻璃 |
 
 **页头尺寸推导**：76px = 8px 顶 inset + 32px 标题行（容纳插件页 32px 按钮，故比对话区的 10px inset 少 2px） + 10px 间距 + 25px tab 行。
 
