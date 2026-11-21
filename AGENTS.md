@@ -139,14 +139,14 @@ DeepSeek Harness（DSH）Web 插件合集，每个插件独立 npm 包、独立�
 - **owner 的 web profile 固定 `link:`** 直连本仓库插件目录；profile 级 `cordis.patch.yml` 保持 `[]`（插件经各插件 `package.json` 的 `dsh.profile.bundles` 装载，重复 insert 会 `duplicate loader entry id`）。
 - **官方版本跟随**：不硬跟每个官方预发布；新 rc 先 bump devDeps / overrides 并跑 verify，影响预判记 `docs/upstream/`；只有代码或支持范围变化才需要发版。dsh 升级仍是正式适配任务。
 - **发布确认（硬门禁，owner 当次点头）**：`git tag` / `npm publish` 等不可逆的对外发布动作，执行前必须由 owner 当次明确确认；「之前批准了整条发布流程」「按你建议走」「继续」不构成发布许可；agent 停在 push tag 之前，一句话报出要发哪个插件、版本号、目标通道、影响范围，未回话即视为未批准。
-- **流程**：改动 push dev + 插件 verify → 版本号 + CHANGELOG 双份 → 再 verify + `git diff --check` → dev→main（ff）并 push → `git tag -a <插件名>-vX.Y.Z -F <说明文件>`（说明用 `node scripts/tag-notes.mjs <插件名> <版本号>` 生成；Windows 先输出到文件再 `-F`）→ 逐个 push tag → 盯 Publish success + `npm view` 复核版本与 dist-tag → 切回 dev。版本号编辑只动该插件自己的 `package.json`。
+- **流程**：改动走 PR 直接进 `main` + 插件 verify → 版本号 + CHANGELOG 双份 → 再 verify + `git diff --check` → 合并 PR → 在 `main` 上 `git tag -a <插件名>-vX.Y.Z -F <说明文件>`（说明用 `node scripts/tag-notes.mjs <插件名> <版本号>` 生成；Windows 先输出到文件再 `-F`）→ 逐个 push tag → 盯 Publish success + `npm view` 复核版本与 dist-tag。版本号编辑只动该插件自己的 `package.json`。
 - **tag 兜底**：GitHub 一次推超过三个 tag 时不生成 push 事件——逐个推（或每批 ≤3 个），推完 30 秒内查 Publish run，没有就 `gh workflow run publish.yml -f plugin=<插件名>` 手动派发（本仓库不建 GitHub Release）。
 - **红线**：已发布版本 / tag 不可覆盖、不可挪动，同版本重发 E403；错误只能发新版本 + deprecate 坏版本；tag 版本必须等于 `package.json` version；tag 提交必须在 `main` 上；promote 目标只能是 `latest` / `next`；`secrets` 不能出现在 step 的 `if`（经 job 级 env 中转）；`--provenance` 要求声明 `repository`。
 - **发布后收尾**：每个包配 npm Trusted Publishing（Organization `peiyucn`、Repository `dsh-sparrow`、Workflow `publish.yml`、Environment `npm-publish`）；配完删 `NPM_TOKEN` 并 revoke 旧 token；新包首发走 Automation token 或 owner 本机首发后立即补配。
 
 ## 3. 实现
 
-- **分支**：日常在 `dev`，默认分支 `main`；发布时 dev → main fast-forward（E7）。
+- **分支**：单分支 `main`；改动走 PR 直接进 `main`，发布即打 tag（不再有 `dev` 集成分支）。
 - **标准命令（E8）**：
   - `npm run lint:code`：ESLint，共享 `meta/lint/eslint-base.mjs` + 项目 `meta/lint/project-eslint.mjs`。
   - `npm run lint:policy`：`node scripts/check-policy.mjs`（QG001–QG010）→ `npm run check`（守卫链）。
@@ -156,7 +156,7 @@ DeepSeek Harness（DSH）Web 插件合集，每个插件独立 npm 包、独立�
 - **测试侧类型检查**：每个插件 `tsconfig.test.json` 检查 `test/**/*.ts`；根 `tsconfig.test.json` 检查根 `test/**/*.ts`（QG 负例）。测试全部是 `.ts`，Node 24 原生剥类型运行。
 - **纯逻辑目录**：`plugins/dsh-desk-one/src/model`（L003）。项目 ESLint 配置为 `meta/lint/project-eslint.mjs`，根目录无 `eslint.config.mjs`（L007）。
 - **CI（`.github/workflows/ci.yml`）**：`typecheck` → `build` → `test` → `package`（E24）。`typecheck` job 先跑 `pnpm run lint`、`test:policy`、`typecheck:policy`，再 `typecheck:all`；`test` job 上传 JUnit artifact。
-- **required checks**：`typecheck`、`build`、`test`、`package`（F5 / E24）。已配置（2026-11-18）：严格 PR 门禁 ruleset 覆盖 `main` / `dev`，required checks 四项、strict 策略开启、owner bypass = `pull_request`；发布 tag 保护 ruleset 覆盖 `refs/tags/*-v*`、owner bypass = `always`；默认分支与 `dev` 各一条轻保护 ruleset；合并设置 squash-only、合并后删除分支。
+- **required checks**：`typecheck`、`build`、`test`、`package`（F5 / E24）。已配置（2026-11-21）：严格 PR 门禁 ruleset 仅覆盖 `main`，required checks 四项、strict 策略开启、owner bypass = `pull_request`；发布 tag 保护 ruleset 覆盖 `refs/tags/*-v*`、owner bypass = `always`；默认分支一条轻保护 ruleset；合并设置 squash-only、合并后删除分支。
 - **发布（`.github/workflows/publish.yml`）**：environment `npm-publish`；tag `<插件名>-vX.Y.Z`；tag 提交须在 `main`；发布前跑 `pnpm run lint` 与插件 `npm run verify`；E18 安全门禁用 `SECURITY_ALERTS_TOKEN`，在 `npm publish` 前 fail-closed；promote 手动任务只允许 `latest` / `next`；不建 GitHub Release。
 - **部署**：`.github/workflows/market.yml` 的 `deploy` job 发布 `dsh.pyai.site`（environment `github-pages`）。
 - **打包产物（E9）**：npm 包内容由各插件 `package.json` 的 `files` 决定（`lib/**`、`cordis.patch.yml`、中英 README / CHANGELOG）；`lib/` 是构建产物、不进 git；仓库不保留 `releases/`。
