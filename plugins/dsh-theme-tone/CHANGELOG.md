@@ -2,17 +2,13 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
-## [0.2.2-rc.5] - 2026-11-19
+## [0.2.2-rc.5] - 2026-11-22
 
+- Fixed a macOS desktop issue where enabling a tone could lock the window: it could no longer be dragged, and
+  double-clicking the title bar no longer zoomed or maximized it. Windows was unaffected.
+- Fixed a startup regression from that fix that could leave the app on “Loading plugins…” until the page was
+  scrolled. The main UI now appears normally after startup.
 - Adapted to official dsh 0.2.2-rc.5 (web and desktop).
-- Fixed a macOS desktop bug: enabling a tone locked the Desktop window — it could no longer be dragged and
-  double-clicking the title bar no longer zoomed / maximized it. The full-screen backdrop layer is now mounted
-  inside the host `#root` instead of as a direct `body` child, so the host's `body > :not(#root)` rule no longer
-  turns the whole window into a non-draggable region. Windows was unaffected.
-- Fixed a startup regression from that change: the host client boots with `hydrateRoot` over `#root`, so the
-  backdrop layer must not be inserted as a `#root` child while the boot overlay is still there — otherwise the
-  overlay stuck at "Loading plugins…" and the main UI only showed after scrolling. The layer now moves into
-  `#root` after the boot handoff completes (bounded retries + repaint fallback; no observers or rAF).
 
 ## [0.2.2-rc.3] - 2026-11-15
 
