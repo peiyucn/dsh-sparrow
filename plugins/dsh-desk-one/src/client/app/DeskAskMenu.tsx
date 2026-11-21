@@ -94,7 +94,7 @@ export function DeskAskMenu({ t, tab, onAskDesk }: {
                 onAskDesk(t(entry.prompt))
               }}
             >
-              {t(entry.label)}
+              {`“${t(entry.label)}”`}
             </MenuItemButton>
           </div>
         </Tooltip>
