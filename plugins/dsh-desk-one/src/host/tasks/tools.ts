@@ -225,5 +225,28 @@ export function registerTaskTools(ctx: Context, store: DeskStore): void {
     },
   }))
 
-  ctx.logger.info?.(`${PACKAGE_NAME}: registered 5 desk task tools`)
+  ctx.tools.register(defineTool({
+    name: 'desk_task_delete',
+    description: 'Permanently delete one desk task card. Only use when the user explicitly asks to delete the card; use desk_task_list to get the current revision first. Linked sessions and groups are not deleted.',
+    parameters: {
+      id: { type: 'string', required: true, description: 'Task id from desk_task_list.' },
+      expected_revision: { type: 'number', required: true, description: 'Revision returned by desk_task_list.' },
+    },
+    output: textOutput,
+    async execute(args) {
+      try {
+        const task = store.listTasks().find(candidate => candidate.id === args.id)
+        if (task === undefined) throw new Error(`任务不存在：${args.id}`)
+        if (task.revision !== args.expected_revision) {
+          throw new Error(`任务已被修改（当前 revision ${task.revision}，请求 ${args.expected_revision}）`)
+        }
+        await store.deleteTask(args.id)
+        return JSON.stringify({ ok: true, deleted: true, summary: `已删除任务「${task.title}」` })
+      } catch (error) {
+        toolError(error)
+      }
+    },
+  }))
+
+  ctx.logger.info?.(`${PACKAGE_NAME}: registered 6 desk task tools`)
 }

@@ -1,6 +1,6 @@
 # 12 · 会话识别任务：常驻 system prompt + 已有任务补挂
 
-> 状态：**已实现（2026-11-19），待 owner 真机验收。**目标版本：**0.2.2-rc.5**（与 rc5 适配、归档/五色板一起发；发布暂缓到 spec 与证据齐全）。
+> 状态：**已实现（2026-11-19）；2026-11-22 放宽触发语义，待 owner 真机验收。**目标版本：下一次插件版本（rc.5 已发布，不再改动）。
 > 前置：`10-task-capture.md`（Phase 1：skill + 工具）、PR #9（`desk_task_update` 可给已有任务补挂当前会话）。
 
 ## 背景与问题
@@ -22,16 +22,20 @@ Phase 1 只有 desk-one skill + 工具，触发依赖模型是否加载 skill，
 | 4 | 已有未挂任务 | 先问是否把本会话补挂到已有任务；同意后用 PR #9 的 `desk_task_update` + `link_current_session`，不新建卡 |
 | 5 | 版本 | 并入 `0.2.2-rc.5`；发布继续暂缓到 spec / 证据齐全，且 owner 当次确认 |
 | 6 | 上限 | 沿用 `MAX_TASK_SESSIONS`（当前 10）；不改成 5 |
+| 7 | 触发语义 | 任务性质 = 要求产出 / 修改 / 验证 / 协调 / 接手一个有落地结果的工作；代码 / 文件 / 配置 / 数据 / 文档 / 交付物 / 多步跟进都算 |
+| 8 | 触发时点 | 第一条实质性请求；第一句只是上下文时顺延；会话后来明显多步且尚未捕获时可补问一次；每会话最多问一次 |
+| 9 | 删除 | 新增 `desk_task_delete`，仅用户明确要求删除时用；带 revision；只删卡片，不删会话 / 分组 |
 
 ## 触发规则
 
-- 只看**面向用户的主会话的第一条用户输入**；后续轮次不再主动问。
+- 只看**面向用户的主会话的第一条实质性请求**；第一句只是打招呼 / 上下文时顺延。
+- 每个会话最多问一次；会话后来明显进入多步工作且尚未捕获时，允许补问一次。
 - 不在 subagent 会话触发。
-- 只认可跟踪事项：任务 / 待办 / 提醒 / 跟进 / 计划 / 截止日期 / 明确要记下来的事。
-- 不因出现「任务」二字就触发；纯问答、解释、改代码 / 改文件、Desk One 用法提问不触发。
+- 任务性质：要求产出 / 修改 / 验证 / 协调 / 接手一个有落地结果的工作；代码 / 文件 / 配置 / 数据 / 文档修改、交付物、验收、多步跟进都算。
+- 不因出现「任务」二字就触发；纯问答、解释、只读且没有后续的请求、Desk One 用法提问不触发。
 - 本会话已挂任务 → 不再问。
 - 用户拒绝后本会话不再问。
-- 用户明确要求建任务 / 补挂时，直接执行，不再问一遍。
+- 用户明确要求建任务 / 补挂 / 删卡时，直接执行，不再问一遍。
 
 ## Prompt section
 
@@ -42,11 +46,13 @@ Phase 1 只有 desk-one skill + 工具，触发依赖模型是否加载 skill，
 - 文本草案：
 
 ```text
-Desk One task capture (first user input only):
-Only when the first user input of a user-facing session clearly describes follow-up work (a task, todo, reminder, follow-up, plan, or deadline), ask once before writing.
+Desk One task capture (active, once per session):
+A user request has task nature when it asks you to produce, change, verify, coordinate, or take over work with a concrete outcome beyond an explanation. This includes file, code, config, data or document changes; a deliverable or acceptance step; and multi-step work that will need follow-up.
+
+On the first substantive user request that has task nature, ask once before writing. If the first message is only context, evaluate the first substantive request. If the session becomes clearly multi-step later and no capture has been asked, ask once then.
 
 Before asking:
-- Do not trigger for pure Q&A, explanations, code/file edits, subagent sessions, or when this session is already linked to a task.
+- Do not trigger for pure Q&A, explanations or read-only lookups with no follow-up; do not trigger for subagent sessions or when this session is already linked to a task.
 - Call desk_task_list with linked_to_current_session=true. If it returns a task, this session is already linked: do nothing.
 - If this conversation already created a matching task that is not linked, or the user names an existing task, ask whether to link this session to that task. On consent call desk_task_update with link_current_session=true and the task's current revision; do not create a duplicate.
 - If several existing tasks could match, ask the user which one; never guess.
@@ -69,13 +75,17 @@ Never create a task or change a link without the user's explicit consent. If the
 
 复用 PR #9 的 `desk_task_update` + `link_current_session: true`；不新增工具、不开放任意 `session_id` 补挂；解绑见 15。
 
+### 删除
+
+新增 `desk_task_delete(id, expected_revision)`：仅用户明确要求删除时使用；只删任务卡，不删关联会话 / 分组。UI 的二次确认删除保持不变。
+
 ## 数据与边界
 
 - 不新增存储字段；复用任务 `sessionIds`。
 - 不自动改任务状态、截止日期、分组、颜色。
 - 不跨会话自动扫描 / 自动匹配任务；跨会话任务只能由用户点名后补挂。
 - 不静默创建任务、不静默改关联；读 `desk_task_list` 可以发生在询问之前。
-- 不改变 `10-task-capture.md` 的 Phase 1 触发语义，只补常驻提示层与去重能力。
+- 与 `10-task-capture.md` 的触发语义保持一致；本次放宽只改触发边界，不改变先问后建。
 - system prompt 服务是可选的：宿主没有 `systemPrompt` 服务时退化为 skill-only，不影响插件启动。
 - 需要为 desk-one 增加 `@deepseek-ai/dsh-system-prompt` 的 peer/devDependency（rc.4 版本线）。
 
@@ -92,8 +102,8 @@ Never create a task or change a link without the user's explicit consent. If the
 
 ## 验收
 
-1. 新会话第一条输入「帮我记一下，周三要交报告」→ 只问一次；同意后建 `todo`，任务卡出现本会话 chip；无重复。
-2. 同一会话后续轮次 → 不再主动问。
+1. 新会话第一条实质性请求「帮我改一下这个页面」→ 只问一次；同意后建 `todo`，任务卡出现本会话 chip；无重复。
+2. 同一会话后续轮次 → 不再主动问；只有会话后来明显多步且尚未捕获时允许补问一次。
 3. 「解释一下这个报错」「任务板怎么用？」→ 不问。
 4. 本会话已挂任务 → 不问。
 5. 本会话里已建过任务但未挂会话 → 问「补挂到已有任务」；同意后用 `desk_task_update` 补挂，不新建卡。

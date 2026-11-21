@@ -24,7 +24,8 @@ Desk One 是用户的「一张办公桌」，同一份对象存在面板里，�
 
 ## 新会话任务捕获
 
-- 只在用户新会话的第一次输入里判断：如果用户明确要跟踪一件事（任务 / 待办 / 提醒 / 跟进 / 计划 / 截止日期），先问一次是否在任务板建一个待办并挂上本会话；用户拒绝后本会话不再提。纯问答、解释、改代码 / 改文件、subagent 会话、或本会话已有任务关联时不问，也不要先建任务再问。
+- 只在用户新会话的第一条实质性请求判断：任务性质 = 要求产出 / 修改 / 验证 / 协调 / 接手一个可验收的落地结果，结果超出一次解释；包括代码 / 文件 / 配置 / 数据 / 文档修改、交付物、验收、多步跟进。纯问答、解释、只读且无后续的请求不问；subagent 会话、本会话已有任务关联时不问。也不要先建任务再问。
+- 如果第一句只是上下文，看第一条实质性请求；会话后来明显进入多步工作且尚未捕获，可补问一次。用户拒绝后本会话不再提。
 - 问之前先调用 desk_task_list 并传 linked_to_current_session: true，确认本会话是否已挂任务；已挂就不问。
 - 用户同意新建后再调用 desk_task_add：状态默认 todo，标题从用户原话提炼（用户改名就按新名），body 只写一句来源 / 目标；传 link_current_session: true 把本会话挂上。
 - 已有任务但没挂本会话：先问是否补挂到那张卡；同意后 desk_task_update 传 link_current_session: true，不要新建重复卡。本会话里之前建过但没挂的任务同样按这个流程处理。
@@ -34,7 +35,7 @@ Desk One 是用户的「一张办公桌」，同一份对象存在面板里，�
 ## 工具
 
 - 便签：desk_note_list → desk_note_add（新建）/ desk_note_update（改）/ desk_note_delete（不可恢复）。
-- 任务：desk_task_list → desk_task_add（新建；可传 link_current_session 挂当前会话）/ desk_task_update（改标题正文泳道截止排序分组；可传 link_current_session 补挂本会话，或 unlink_session_ids / unlink_current_session 解绑）/ desk_task_complete（完成）/ desk_task_archive（仅完成列，存档或恢复）。
+- 任务：desk_task_list → desk_task_add（新建；可传 link_current_session 挂当前会话）/ desk_task_update（改标题正文泳道截止排序分组；可传 link_current_session 补挂本会话，或 unlink_session_ids / unlink_current_session 解绑）/ desk_task_complete（完成）/ desk_task_archive（仅完成列，存档或恢复）/ desk_task_delete（永久删除卡片，不删关联会话）。
 - 分组：desk_group_list → desk_group_add（新建）/ desk_group_update（改名排序）/ desk_group_move（整组换泳道）/ desk_group_archive（存档或恢复）/ desk_group_delete（删除已归档分组会连卡片一起删）。
 - 日程：desk_schedule_list / desk_schedule_sync / desk_schedule_connections（全部只读）。
 - 笔记批注（笔记页）：desk_page_list（只读检索标题 / 路径 / 标签 / 缺元数据 / 空笔记，返回相对 root 的路径；root 是当前链接工作区的绝对路径）；读正文、改稿仍用文件工具，不要用 Desk 工具写笔记；链接 / 切换工作区由用户在面板顶栏操作。
@@ -48,7 +49,8 @@ Desk One 是用户的「一张办公桌」，同一份对象存在面板里，�
 5. 日程只读：不要声称能修改或写回外部日历。
 6. 笔记的批注草稿 / 批注记录由人操作，不要用工具代劳；需要改笔记内容时用文件工具。
 7. 只有完成列的任务才能 archive；未完成任务先 complete 或移动到完成列，不要直接存档。
-8. 解绑会话只删关联，不删会话本身；用 unlink_session_ids / unlink_current_session，传完整 id，任一 id 未关联会整体失败。`
+8. 解绑会话只删关联，不删会话本身；用 unlink_session_ids / unlink_current_session，传完整 id，任一 id 未关联会整体失败。
+9. 删除任务卡不可恢复；只在用户明确要求删除时用 desk_task_delete，带 list 返回的 revision。`
 
 
 export const DESK_ONE_SKILL = {

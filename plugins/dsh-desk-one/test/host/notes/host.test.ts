@@ -105,7 +105,7 @@ describe('host 装配（apply 接线）', () => {
         'desk_note_add', 'desk_note_delete', 'desk_note_list', 'desk_note_update',
         'desk_page_list',
         'desk_schedule_connections', 'desk_schedule_list', 'desk_schedule_sync',
-        'desk_task_add', 'desk_task_archive', 'desk_task_complete', 'desk_task_list', 'desk_task_update',
+        'desk_task_add', 'desk_task_archive', 'desk_task_complete', 'desk_task_delete', 'desk_task_list', 'desk_task_update',
       ],
     )
     assert.ok(collected.effects.length >= 2, '存储域与路由都要有 effect 清理')
