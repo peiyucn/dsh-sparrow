@@ -67,6 +67,14 @@ export function persistReviewSession(notebook: NotebookApi, input: {
 }
 
 
+export function forgetReviewSession(sessionId: string): void {
+  const hadId = reviewSessionIds.delete(sessionId)
+  const hadMarker = markers.delete(sessionId)
+  if (!hadId && !hadMarker) return
+  for (const listener of listeners) listener()
+}
+
+
 export function isReviewSession(sessionId: string): boolean {
   return reviewSessionIds.has(sessionId)
 }

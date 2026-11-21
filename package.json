@@ -2,7 +2,7 @@
   "name": "dsh-sparrow",
   "private": true,
   "type": "module",
-  "version": "0.2.2-rc.3",
+  "version": "0.2.2-rc.5",
   "description": "A collection of small DeepSeek Harness (DSH) web plugins",
   "packageManager": "pnpm@11.22.0",
   "engines": {

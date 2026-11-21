@@ -99,6 +99,10 @@ export function markReviewSession(input: MarkReviewSessionRequest): Promise<void
   return postJson<{ sessionId: string }>(ROUTES.notebookReviewSessions, input).then(() => undefined)
 }
 
+export function unmarkReviewSession(sessionId: string): Promise<void> {
+  return deleteJson<{ ok: boolean }>(ROUTES.notebookReviewSessions, { sessionId }).then(() => undefined)
+}
+
 
 export function notebookHistory(): Promise<ReviewHistoryResponse> {
   return fetchJson<ReviewHistoryResponse>(ROUTES.notebookHistory)
@@ -142,6 +146,7 @@ export interface NotebookApi {
   readonly saveDraft: typeof saveNoteDraft
   readonly listReviewSessions: typeof listReviewSessions
   readonly markReviewSession: typeof markReviewSession
+  readonly unmarkReviewSession: typeof unmarkReviewSession
   readonly history: typeof notebookHistory
   readonly recordReview: typeof recordReview
   readonly deleteHistory: typeof deleteReviewRecord
@@ -162,6 +167,7 @@ export const notebookApi: NotebookApi = {
   saveDraft: saveNoteDraft,
   listReviewSessions,
   markReviewSession,
+  unmarkReviewSession,
   history: notebookHistory,
   recordReview,
   deleteHistory: deleteReviewRecord,

@@ -10,7 +10,7 @@ After a short typing pause, a suggestion card appears above the input — **Tab*
 
 Open **Plugins → Add plugin**, enter `@dsh-sparrow/dsh-chat-fim`, and enable it. Or use the shared market-index flow described in the [root README](../../README.md).
 
-Requires DSH 0.2.2-rc.3 — the exact official version line this release is built and verified against (newer lines, pre-releases in particular, are not covered).
+Requires DSH >=0.2.2-rc.3 <0.2.3 — the 0.2.2 line; built and verified against 0.2.2-rc.5 (newer lines, pre-releases in particular, are not covered).
 
 > Install through the DSH plugin manager. A raw npm install does not register the package in the DSH web profile; restart DSH after installing.
 

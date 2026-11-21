@@ -7,6 +7,7 @@ import { createDeskRequestHandler } from './host/router.js'
 import { DeskStore } from './host/store.js'
 import { NotebookHost } from './host/notebook/host.js'
 import { installDeskSkill } from './host/skill.js'
+import { installTaskCapturePrompt } from './host/prompt.js'
 import { ScheduleHost } from './host/schedule/host.js'
 import { registerScheduleTools } from './host/schedule/tools.js'
 import { registerNotebookTools } from './host/notebook/tools.js'
@@ -52,6 +53,7 @@ export async function apply(ctx: Context, config: SessionsConfig = {}): Promise<
 
 
   installDeskSkill(ctx)
+  installTaskCapturePrompt(ctx)
   if (sessions !== undefined) {
 
 

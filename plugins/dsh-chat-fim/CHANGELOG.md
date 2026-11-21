@@ -2,6 +2,10 @@
 
 English | [简体中文](CHANGELOG.zh-CN.md)
 
+## [0.2.2-rc.5] - 2026-11-19
+
+- Adapted to official dsh 0.2.2-rc.5 (web and desktop); no user-perceivable changes.
+
 ## [0.2.2-rc.3] - 2026-11-15
 
 - The rotating highlight shown while FIM is thinking now hugs the composer border, with no gaps at the corners.

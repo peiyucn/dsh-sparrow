@@ -48,12 +48,13 @@ export function useReviewSession(input: {
 
 
   useEffect(() => {
+    if (params?.markOnOpen !== true) return
     persistReviewSession(notebook, {
       sessionId,
       ...workspaceId === undefined ? {} : { workspaceId },
       ...fileId === undefined ? {} : { fileId },
     })
-  }, [fileId, notebook, sessionId, workspaceId])
+  }, [fileId, notebook, params?.markOnOpen, sessionId, workspaceId])
   return {
     target: path === undefined || fileId === undefined || workspaceId === undefined
       ? undefined

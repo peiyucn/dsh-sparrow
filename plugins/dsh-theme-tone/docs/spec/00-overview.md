@@ -15,6 +15,16 @@
    新增的 `will-change: transform` 覆盖成 `auto`（0.2.1 的座位没有这条合成提示）。座位透明后，正文仍
    从卡片玻璃下滚过、页面底光真实透出；漏出的正文由功能 4 的座位内补缝带盖住（补缝带重新用
    `background-attachment: fixed`，定位区回到视口）。
+
+   **挂载点**：全屏装饰层优先挂到宿主 `#root` 内（没有 #root 的独立预览页回退 `body`），**不得挂成
+   `body` 直系节点**——macOS 宿主的 `html[data-platform=darwin] body>:not(#root)` 规则会把 body 直系
+   的全屏层算成一整屏 no-drag 矩形，Electron 把 drag / no-drag 当矩形处理（`pointer-events: none` 不
+   豁免），会从窗口拖动区域里整块减掉，表现为窗口拖不动、双击标题栏不能最大化（Windows 的拖动面是
+   独立 caption 行，不受影响）。挂进 `#root` 后该选择器不匹配，层序仍由 CSS z-index 决定。
+   **boot 交接**：宿主客户端 boot 期间，`#root` 直系有 `[data-dsh-boot]` 启动遮罩，ui-renderer 用
+   `hydrateRoot` 按「遮罩是唯一首个子节点」接管 `#root`；此时多插一个非 React 子节点会打乱交接，
+   表现为启动遮罩卡在「Loading plugins…」。故交接未完成时地面层先放 `body`（遮罩盖着、无交互），
+   交接完成后（有界 `setTimeout` 重试 + 每次重绘兜底）再迁进 `#root`；不引入 MutationObserver / rAF。
 3. **对话区顶栏玻璃**：顶栏浮层化（`position: absolute` + 滚动区 `padding-top: 76px` + 滚动条 track 下推
    + 拖拽条上沿 76px），玻璃放顶栏 `::before`（`z-index: -1`）：54% 底色填充 + 冷调提亮模糊 + 85% 强度的
    页面金光。金光按**视口坐标**叠加（`background-attachment: fixed` + `100vw 100vh`），与左栏顶部取的是
@@ -122,6 +132,9 @@
 8. **输入框只用纯 CSS**：不引入动态 SVG / ResizeObserver / rAF / 按尺寸生成的位移图；卡片透明，
    材质只在 `::before`，不占用 `::after`（官方 `.cardWorkspaceTrigger` 的无工作区虚线框）。
    边缘光必须保持方向性，不能做成四条等亮的边。
+9. **地面层挂载点**：`#root` 存在时挂 `#root` 内，仅有回退 `body`；不得直接挂成 `body` 直系
+   （macOS 全屏 no-drag ⇒ 窗口锁死，见功能 2 的挂载点说明）。boot 交接未完成（`#root` 直系还有
+   `[data-dsh-boot]` 遮罩）时先挂 `body`，交接完成后再迁入（见功能 2 的 boot 交接说明）。
 
 ## 已知偏离 / 已知问题
 

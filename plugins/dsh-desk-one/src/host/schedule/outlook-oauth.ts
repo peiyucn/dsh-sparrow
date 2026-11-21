@@ -2,7 +2,7 @@
 
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
-import { OUTLOOK_GRAPH_REFRESH_REF } from '../../constants.js'
+import { OUTLOOK_GRAPH_REFRESH_REF, ROUTES } from '../../constants.js'
 import type {
   DeskScheduleSource, OutlookLoginPollResponse, OutlookLoginStartResponse, ScheduleStateResponse,
   ScheduleSyncSourceReport,
@@ -28,6 +28,29 @@ type OutlookFlow =
 
 
 const MAX_OUTLOOK_FLOWS = 32
+
+
+function loopbackOf(hostname: string): boolean {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1'
+}
+
+
+function callbackUriOf(ctx: Context, requested: string): string {
+  const server = ctx.get('webServer') as { getOrigin?: () => string } | undefined
+  if (server === undefined || typeof server.getOrigin !== 'function') return requested
+  let origin: URL
+  try {
+    origin = new URL(server.getOrigin())
+  } catch {
+    return requested
+  }
+  if (!loopbackOf(origin.hostname) || (origin.protocol !== 'http:' && origin.protocol !== 'https:')) return requested
+  if (origin.hostname === '127.0.0.1' || origin.hostname === '[::1]' || origin.hostname === '::1') origin.hostname = 'localhost'
+  origin.pathname = ROUTES.scheduleOutlookCallback
+  origin.search = ''
+  origin.hash = ''
+  return origin.toString()
+}
 
 
 export interface OutlookOAuthDeps {
@@ -60,17 +83,18 @@ export class OutlookOAuth {
       const verifier = randomUUID() + randomUUID()
       const state = randomUUID()
       const flowId = randomUUID()
+      const callbackUri = callbackUriOf(this.ctx, redirectUri)
       this.outlookFlows.set(flowId, {
         kind: 'redirect',
         verifier,
         state,
-        redirectUri,
+        redirectUri: callbackUri,
         expiresAt: Date.now() + 10 * 60_000,
       })
       return {
         flowId,
         kind: 'redirect',
-        authUrl: graphAuthorizeUrl({ redirectUri, state, challenge: await codeChallenge(verifier) }),
+        authUrl: graphAuthorizeUrl({ redirectUri: callbackUri, state, challenge: await codeChallenge(verifier) }),
         userCode: '',
         verificationUri: '',
         expiresIn: 600,

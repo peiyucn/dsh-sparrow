@@ -10,7 +10,7 @@ English | [简体中文](README.zh-CN.md)
 
 ## What it is
 
-* Annotations: Link a registered DSH workspace as the notebook library, browse its Markdown / text files, and open a page in a dedicated annotation Session — exact source lines, a per-Session round baseline. No editor, no git dependency and no new-note form.
+* Annotations: Link a registered DSH workspace as the notebook library, browse its Markdown / text files, and open a page in the current conversation for annotation (or explicitly in a new Session) — exact source lines, a per-Session round baseline. No editor, no git dependency and no new-note form.
 * Notes: A free-form sticky canvas with in-place editing, drag, resize, colour, layer order and a trash; **Smash!** clears the wall into the trash after a confirmation.
 * Tasks: To do / Doing / Done lanes with colour tags, day-granular due dates, pointer dragging, one-level groups and a Done archive. Cards can link DSH sessions with **@**.
 * Schedule: WeCom, iCloud and personal Outlook (Microsoft Graph) calendars plus public ICS subscriptions, shown as Start / Today / Upcoming plus month / week / list views.
@@ -18,7 +18,7 @@ English | [简体中文](README.zh-CN.md)
 
 ## Requirements
 
-* Requires DSH 0.2.2-rc.3, the exact version line the other plugins in this repository pin.
+* Requires DSH >=0.2.2-rc.3 <0.2.3, the 0.2.2 line; other plugins in this repository share the same range. This release is built and verified against 0.2.2-rc.5.
 * Node.js 24.9 or newer, matching the DSH host requirement.
 * Notes, tasks and session management need no network or account setup. **Schedule aggregation** needs at least one source configured in the panel (WeCom CalDAV sync password, iCloud app-specific password, or personal Outlook via Microsoft Graph); public ICS subscriptions are added from the same settings page.
 

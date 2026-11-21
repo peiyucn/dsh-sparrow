@@ -181,6 +181,8 @@ export class DeskStore {
 
   async markReviewSession(input: MarkReviewSessionInput): Promise<ReviewSessionMarker> { return this.review.markReviewSession(input) }
 
+  async unmarkReviewSession(sessionId: string): Promise<boolean> { return this.review.unmarkReviewSession(sessionId) }
+
   async createReviewRecord(input: CreateReviewRecordInput): Promise<ReviewRecord> { return this.review.createReviewRecord(input) }
 
   listReviewRecords(): ReviewRecord[] { return this.review.listReviewRecords() }

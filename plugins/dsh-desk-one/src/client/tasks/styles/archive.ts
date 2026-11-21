@@ -192,4 +192,30 @@ export const TASK_ARCHIVE_CSS = `
 @media (prefers-reduced-motion: reduce) {
   .dsh-task-session-preview { animation: none; }
 }
+.dsh-task-archive-row[data-color='default'] { --dsh-task-running-accent: var(--dsh-desk-color-default-accent); }
+.dsh-task-archive-row[data-color='yellow'] { --dsh-task-running-accent: var(--dsh-desk-color-yellow-accent); }
+.dsh-task-archive-row[data-color='green'] { --dsh-task-running-accent: var(--dsh-desk-color-green-accent); }
+.dsh-task-archive-row[data-color='blue'] { --dsh-task-running-accent: var(--dsh-desk-color-blue-accent); }
+.dsh-task-archive-row[data-color='pink'] { --dsh-task-running-accent: var(--dsh-desk-color-pink-accent); }
+.dsh-task-archive-row[data-running='true'] {
+  position: relative;
+  border-radius: 8px;
+}
+.dsh-task-archive-row[data-running='true']::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: 0;
+  box-sizing: border-box;
+  padding: 1px;
+  border-radius: 8px;
+  background: conic-gradient(from var(--dsh-task-card-orbit-angle), transparent 0deg, var(--dsh-task-running-ring) 48deg, transparent 96deg, transparent 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: dsh-task-card-orbit 3s linear infinite;
+  pointer-events: none;
+  --dsh-task-running-ring: color-mix(in srgb, var(--dsh-task-running-accent) 78%, var(--dsw-alias-label-primary, #1f2329));
+}
 `

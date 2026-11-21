@@ -15,6 +15,7 @@ import { LANE_LABEL_KEY } from '../taskLabels.js'
 import { TaskArchiveView } from './TaskArchiveView.js'
 import { TaskColumn, type DropTarget, type GroupDropTarget } from './TaskColumn.js'
 import { createCardGhost, createGroupGhost, lockSelection, placeGhost } from './taskDrag.js'
+import { hasRunningSession } from './taskCardUtils.js'
 
 interface TaskBoardProps {
   readonly t: DeskTranslator
@@ -297,6 +298,12 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
     data.savePatch(task, { sessionIds })
   }, [data.savePatch, data.setTasks])
 
+  const archivedRunningIds = useMemo(() => new Set(
+    board.archivedTasks
+      .filter(task => hasRunningSession(sessionsFor(task.sessionIds)))
+      .map(task => task.id),
+  ), [board.archivedTasks, sessionsFor])
+
 
   const deleteArchivedGroup = (group: DeskTaskGroup): void => {
     data.setTasks(current => current.filter(task => task.groupId !== group.id))
@@ -328,6 +335,7 @@ export function TaskBoard({ t, data, groupsData, board, sessionLink }: TaskBoard
               groups={board.archivedGroups}
               t={t}
               countText={countText}
+              runningTaskIds={archivedRunningIds}
               onRestoreGroup={(group) => { void board.archiveGroup(group, false) }}
               onDeleteGroup={deleteArchivedGroup}
               onRestoreTask={board.restoreTask}

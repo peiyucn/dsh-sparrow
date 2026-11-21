@@ -22,6 +22,19 @@ export interface NoteReviewParams {
   readonly fileId: string
 
   readonly workspaceId: string
+
+  readonly markOnOpen?: boolean
+}
+
+
+export type ReviewOpenMode = 'current' | 'new' | 'reuse'
+
+
+export interface ReviewOpenOptions {
+
+  readonly mode?: ReviewOpenMode
+
+  readonly sessionId?: string
 }
 
 
@@ -36,7 +49,7 @@ export interface ReviewOpenResult {
 
 export interface ReviewBridge {
 
-  open(input: ReviewOpenInput): Promise<ReviewOpenResult>
+  open(input: ReviewOpenInput, options?: ReviewOpenOptions): Promise<ReviewOpenResult>
 
   openFilesBrowser(workspaceId: string): Promise<ReviewOpenResult>
 
@@ -160,14 +173,23 @@ export function createReviewBridge(): ReviewBridge {
   }
 
   return {
-    async open(input) {
-      const nav = navigation
+    async open(input, options) {
       const sidebar = sidebarRight
-      if (nav === undefined) return { ok: false, message: '对话导航服务不可用（无法新建审阅会话）' }
       if (sidebar === undefined) return { ok: false, message: '右侧栏服务不可用（无法打开审阅视图）' }
       const params: NoteReviewParams = { path: input.path, fileId: input.fileId, workspaceId: input.workspaceId }
+      const mode = options?.mode ?? 'reuse'
+      if (mode === 'current') {
+        if (!await openReviewTab(sidebar, params)) {
+          return { ok: false, message: '当前会话的右侧栏没有就绪，请再点一次「审阅」' }
+        }
+        pruneStaleTabMemos(options?.sessionId)
+        return { ok: true }
+      }
 
-      if (nav.openSession !== undefined) {
+      const nav = navigation
+      if (nav === undefined) return { ok: false, message: '对话导航服务不可用（无法新建审阅会话）' }
+
+      if (mode !== 'new' && nav.openSession !== undefined) {
         try {
           const reusable = await reusableSession(input)
           if (reusable !== undefined) {
@@ -197,6 +219,7 @@ export function createReviewBridge(): ReviewBridge {
       }
 
       let createdSessionId: string | undefined
+      const createdParams: NoteReviewParams = { ...params, markOnOpen: true }
       try {
 
 
@@ -211,7 +234,7 @@ export function createReviewBridge(): ReviewBridge {
       } catch (cause) {
         return { ok: false, message: `新建审阅会话失败：${cause instanceof Error ? cause.message : String(cause)}` }
       }
-      if (!await openReviewTab(sidebar, params)) {
+      if (!await openReviewTab(sidebar, createdParams)) {
         return { ok: false, message: '审阅会话已创建，但右侧栏没有就绪，请再点一次「审阅」' }
       }
       pruneStaleTabMemos(createdSessionId)

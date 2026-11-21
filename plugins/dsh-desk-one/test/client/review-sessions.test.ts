@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  hydrateReviewSessions, isReviewSession, persistReviewSession, pickReusableReviewSession,
+  forgetReviewSession, hydrateReviewSessions, isReviewSession, persistReviewSession, pickReusableReviewSession,
   reviewSessionCandidates, reviewSessionsReady, subscribeReviewSessions,
 } from '../../lib/client/notebook/review/sessions.js'
 
@@ -53,6 +53,24 @@ describe('审阅会话标记', () => {
     persistReviewSession(failing, { sessionId: 'offline-session' })
     assert.equal(isReviewSession('offline-session'), true)
     await new Promise(resolve => setTimeout(resolve, 0))
+    unsubscribe()
+  })
+
+  it('清除标记后本地状态、候选列表与订阅同时更新', () => {
+    let notified = 0
+    const unsubscribe = subscribeReviewSessions(() => { notified += 1 })
+    const notebook = {
+      listReviewSessions: async () => ({ sessionIds: [] }),
+      markReviewSession: async () => undefined,
+      unmarkReviewSession: async () => undefined,
+    }
+    persistReviewSession(notebook, { sessionId: 'clear-session', workspaceId: 'w1', fileId: 'file-clear' })
+    const before = notified
+    assert.equal(isReviewSession('clear-session'), true)
+    forgetReviewSession('clear-session')
+    assert.equal(isReviewSession('clear-session'), false)
+    assert.deepEqual(reviewSessionCandidates('file-clear'), [])
+    assert.ok(notified > before, '清除后通知订阅者重绘图标')
     unsubscribe()
   })
 

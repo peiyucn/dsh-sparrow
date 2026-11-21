@@ -106,6 +106,13 @@ async function reviewSessionMarkRoute(route: DeskRouteContext, req: IncomingMess
   sendJson(res, 200, { sessionId: marker.sessionId })
 }
 
+async function reviewSessionUnmarkRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const body = bodyObject<{ readonly sessionId?: unknown }>(await readJsonBody(req), '请求体必须是对象')
+  if (typeof body.sessionId !== 'string' || body.sessionId === '') throw new DeskError('BAD_BODY', '缺少 sessionId')
+  const removed = await route.store.unmarkReviewSession(body.sessionId)
+  sendJson(res, 200, { ok: true, removed })
+}
+
 async function baselineGetRoute(route: DeskRouteContext, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? '/', 'http://localhost')
   const sessionId = url.searchParams.get('sessionId') ?? ''
@@ -200,6 +207,7 @@ export const NOTEBOOK_ROUTES: readonly DeskRouteEntry[] = [
   { method: 'GET', path: ROUTES.notebookOpenById, handle: openByIdRoute },
   { method: 'GET', path: ROUTES.notebookReviewSessions, handle: reviewSessionsGetRoute },
   { method: 'POST', path: ROUTES.notebookReviewSessions, handle: reviewSessionMarkRoute },
+  { method: 'DELETE', path: ROUTES.notebookReviewSessions, handle: reviewSessionUnmarkRoute },
   { method: 'GET', path: ROUTES.notebookBaseline, handle: baselineGetRoute },
   { method: 'POST', path: ROUTES.notebookBaseline, handle: baselineSaveRoute },
   { method: 'GET', path: ROUTES.notebookDraft, handle: draftGetRoute },

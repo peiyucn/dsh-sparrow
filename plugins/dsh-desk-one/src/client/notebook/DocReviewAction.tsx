@@ -42,28 +42,45 @@ export function DocReviewAction(props: DocReviewActionProps): ReactNode {
   const relativePath = relativeToWorkspace(absolutePath, workspace.path)
   const label = failed ?? t('review.openInPreview')
 
+  const open = (mode: 'current' | 'new'): void => {
+    setBusy(true)
+    setFailed(null)
+    void notebook.open({ workspaceId: workspace.workspaceId, path: relativePath }).then(({ file }) => (
+
+
+      review.open(
+        { path: relativePath, fileId: file.id, workspaceId: workspace.workspaceId },
+        mode === 'current' ? { mode: 'current' } : { mode: 'new' },
+      )
+    )).then((result) => {
+      if (!result.ok) setFailed(result.message ?? t('review.openFailed'))
+    }, (cause: unknown) => {
+      setFailed(messageOf(cause))
+    }).finally(() => setBusy(false))
+  }
+
   return (
-    <Tooltip label={label} side="bottom" delayMs={500}>
-      <Button
-        variant="ghost"
-        size="sm"
-        icon={<span className="dsh-desk-review-entry-icon"><DeskGlyph size={16} strokeWidth={2} /></span>}
-        aria-label={t('review.openInPreview')}
-        disabled={busy}
-        onClick={() => {
-          setBusy(true)
-          setFailed(null)
-          void notebook.open({ workspaceId: workspace.workspaceId, path: relativePath }).then(({ file }) => (
-
-
-            review.open({ path: relativePath, fileId: file.id, workspaceId: workspace.workspaceId })
-          )).then((result) => {
-            if (!result.ok) setFailed(result.message ?? t('review.openFailed'))
-          }, (cause: unknown) => {
-            setFailed(messageOf(cause))
-          }).finally(() => setBusy(false))
-        }}
-      />
-    </Tooltip>
+    <span className="dsh-desk-review-header-actions">
+      <Tooltip label={label} side="bottom" delayMs={500}>
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<span className="dsh-desk-review-entry-icon"><DeskGlyph size={16} strokeWidth={2} /></span>}
+          aria-label={t('review.openInPreview')}
+          disabled={busy}
+          onClick={() => { open('current') }}
+        />
+      </Tooltip>
+      <Tooltip label={t('review.openInNewSession')} side="bottom" delayMs={500}>
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<span className="dsh-desk-review-new-icon">＋</span>}
+          aria-label={t('review.openInNewSession')}
+          disabled={busy}
+          onClick={() => { open('new') }}
+        />
+      </Tooltip>
+    </span>
   )
 }

@@ -41,6 +41,7 @@ export const zh = {
   'sessions.disabled': '宿主未提供会话服务',
   'sessions.noWorkspace': '未记录工作区',
   'sessions.reviewMark': '批注会话',
+  'sessions.clearReviewMark': '清除批注标记',
   'sessions.subagent': '子会话',
 } as const
 
@@ -86,5 +87,6 @@ export const en = {
   'sessions.disabled': 'Session services are unavailable',
   'sessions.noWorkspace': 'No workspace',
   'sessions.reviewMark': 'Annotation session',
+  'sessions.clearReviewMark': 'Clear annotation mark',
   'sessions.subagent': 'Child session',
 } satisfies Record<keyof typeof zh, string>
