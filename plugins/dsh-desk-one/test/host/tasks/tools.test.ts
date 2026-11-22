@@ -45,6 +45,12 @@ function fakeStore(tasks: FakeTask[] = []) {
       const current = tasks.find(task => task.id === id)
       return { ...current, ...patch, revision: (current?.revision ?? 0) + 1 }
     },
+    deleteTask: async (id: string) => {
+      const index = tasks.findIndex(task => task.id === id)
+      if (index < 0) return false
+      tasks.splice(index, 1)
+      return true
+    },
   }
 }
 
@@ -66,6 +72,13 @@ function listTool(store: unknown) {
   const tools = collectTools(registerTaskTools, store) as unknown as Tool[]
   const tool = tools.find(candidate => candidate.name === 'desk_task_list')
   if (tool === undefined) throw new Error('desk_task_list 未注册')
+  return tool
+}
+
+function deleteTool(store: unknown) {
+  const tools = collectTools(registerTaskTools, store) as unknown as Tool[]
+  const tool = tools.find(candidate => candidate.name === 'desk_task_delete')
+  if (tool === undefined) throw new Error('desk_task_delete 未注册')
   return tool
 }
 
@@ -314,5 +327,35 @@ describe('desk_task_list 当前会话过滤', () => {
     const tool = listTool(fakeStore(tasks))
     const output = JSON.parse(String(await tool.execute({}, { agent: { id: 'session-1' } }))) as { total: number }
     assert.equal(output.total, 3)
+  })
+})
+
+describe('desk_task_delete 删除任务卡', () => {
+  it('按 revision 删除任务，不碰会话', async () => {
+    const store = fakeStore([{ id: 'task_1', title: '写周报', revision: 3, sessionIds: ['session-1'] }])
+    const tool = deleteTool(store)
+    const output = JSON.parse(String(await tool.execute({ id: 'task_1', expected_revision: 3 }, {}))) as { deleted: boolean, summary: string }
+    assert.equal(output.deleted, true)
+    assert.match(output.summary, /已删除任务/u)
+    assert.equal(store.tasks.length, 0)
+  })
+
+  it('revision 不一致时拒绝删除', async () => {
+    const store = fakeStore([{ id: 'task_1', title: '写周报', revision: 3, sessionIds: [] }])
+    const tool = deleteTool(store)
+    await assert.rejects(
+      () => tool.execute({ id: 'task_1', expected_revision: 2 }, {}),
+      /任务已被修改/u,
+    )
+    assert.equal(store.tasks.length, 1)
+  })
+
+  it('任务不存在时明确报错', async () => {
+    const store = fakeStore()
+    const tool = deleteTool(store)
+    await assert.rejects(
+      () => tool.execute({ id: 'task_missing', expected_revision: 1 }, {}),
+      /任务不存在/u,
+    )
   })
 })

@@ -85,6 +85,7 @@ describe('任务板契约', () => {
       'desk_task_add',
       'desk_task_archive',
       'desk_task_complete',
+      'desk_task_delete',
       'desk_task_list',
       'desk_task_update',
     ])
