@@ -18,7 +18,7 @@ English | [简体中文](README.zh-CN.md)
 
 ## Requirements
 
-* Requires DSH >=0.2.2-rc.3 <0.2.3, the 0.2.2 line; other plugins in this repository share the same range. This release is built and verified against 0.2.2-rc.5.
+* Requires DSH >=0.2.2-rc.3 <0.2.3, the 0.2.2 line; other plugins in this repository share the same range. This release (0.2.2-rc.5.1) is built and verified against DSH 0.2.2-rc.5.
 * Node.js 24.9 or newer, matching the DSH host requirement.
 * Notes, tasks and session management need no network or account setup. **Schedule aggregation** needs at least one source configured in the panel (WeCom CalDAV sync password, iCloud app-specific password, or personal Outlook via Microsoft Graph); public ICS subscriptions are added from the same settings page.
 
@@ -33,7 +33,7 @@ English | [简体中文](README.zh-CN.md)
 Desk One is built for you and harness together. The same objects the panel writes are exposed to harness through a bundled skill and **19 agent tools**: ask in the conversation and harness edits the same objects the panel shows.
 
 * **The `desk-one` skill** (on by default, also listed in `/`) teaches the agent when to use a note, a task, a group, a schedule query or a notebook page, and the `list → revision → update` flow. It also keeps the notebook boundary: `desk_page_list` only searches the workspace currently linked in the panel; it never writes files.
-* **The 19 tools share the panel's storage and revision checks.** Note, task and group edits carry a revision check, so the agent and the panel cannot silently overwrite each other; a stale write fails with a conflict instead.
+* **The 20 tools share the panel's storage and revision checks.** Note, task and group edits carry a revision check, so the agent and the panel cannot silently overwrite each other; a stale write fails with a conflict instead.
 
 | Group | Tools | What harness can do |
 | :--- | :--- | :--- |

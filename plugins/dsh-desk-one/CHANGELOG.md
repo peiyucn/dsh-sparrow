@@ -4,6 +4,11 @@ English | [简体中文](CHANGELOG.zh-CN.md)
 
 All notable changes to `dsh-desk-one` are documented here. The format follows Keep a Changelog and the version numbers mirror the official DSH release line.
 
+## [0.2.2-rc.5.1] - 2026-11-22
+
+- Task capture now treats project and code work as task work: when a request has a concrete outcome — files, code, config, data or documents changed, a deliverable, verification, or follow-up — Desk One asks once whether to create a task and link the conversation. It checks the first real work request and can ask once later if the work turns into a multi-step task; it still never creates or links silently.
+- The assistant can now permanently delete a task card when you explicitly ask. Only the card is removed; linked conversations and groups are untouched.
+
 ## [0.2.2-rc.5] - 2026-11-22
 
 - Task cards now start with a one-line description that expands on click; the whole card can collapse to a compact row showing title, color, due date and linked-session count. Both states are remembered across reloads.
